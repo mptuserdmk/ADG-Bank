@@ -1,0 +1,104 @@
+### ADG-Bank API Gateway Requests (Port 8080)
+@gateway = http://localhost:8080
+
+### 1. Actuator Health (Gateway)
+GET {{gateway}}/actuator/health
+
+### 2. User Service - Create User (Alex)
+POST {{gateway}}/api/users
+Content-Type: application/json
+
+{
+  "username": "alex_dev",
+  "email": "alex@adgbank.com",
+  "fullName": "Alex Developer"
+}
+
+### 3. User Service - Create User (Elena)
+POST {{gateway}}/api/users
+Content-Type: application/json
+
+{
+  "username": "elena_fin",
+  "email": "elena@adgbank.com",
+  "fullName": "Elena Finance"
+}
+
+### 4. User Service - Get All Users
+GET {{gateway}}/api/users
+
+### 5. User Service - Get User by ID
+GET {{gateway}}/api/users/1
+
+### 6. Account Service - Open Main Account for Alex (10,000 RUB)
+POST {{gateway}}/api/accounts
+Content-Type: application/json
+
+{
+  "userId": 1,
+  "currency": "RUB",
+  "initialDeposit": 10000.00
+}
+
+### 7. Account Service - Open Savings Account for Alex (5,000 RUB)
+POST {{gateway}}/api/accounts
+Content-Type: application/json
+
+{
+  "userId": 1,
+  "currency": "RUB",
+  "initialDeposit": 5000.00
+}
+
+### 8. Account Service - Open Account for Elena (1,000 RUB)
+POST {{gateway}}/api/accounts
+Content-Type: application/json
+
+{
+  "userId": 2,
+  "currency": "RUB",
+  "initialDeposit": 1000.00
+}
+
+### 9. Account Service - Get All Accounts
+GET {{gateway}}/api/accounts
+
+### 10. Account Service - Get Accounts for User 1
+GET {{gateway}}/api/accounts/user/1
+
+### 11. Transaction Service - Transfer 2,500 RUB from Account 1 to Account 3 (Idempotent)
+POST {{gateway}}/api/transactions
+Content-Type: application/json
+X-Idempotency-Key: adg-tx-0001-guid
+
+{
+  "sourceAccountId": 1,
+  "targetAccountId": 3,
+  "amount": 2500.00,
+  "description": "Payment for software consulting"
+}
+
+### 12. Transaction Service - Retry with Same Idempotency Key (Demonstrates Idempotency)
+POST {{gateway}}/api/transactions
+Content-Type: application/json
+X-Idempotency-Key: adg-tx-0001-guid
+
+{
+  "sourceAccountId": 1,
+  "targetAccountId": 3,
+  "amount": 2500.00,
+  "description": "Payment for software consulting"
+}
+
+### 13. Transaction Service - Get All Transactions
+GET {{gateway}}/api/transactions
+
+### 14. Transaction Service - Get Transactions for Account 1
+GET {{gateway}}/api/transactions/account/1
+
+### 15. Check Balances After Transfer
+GET {{gateway}}/api/accounts/1
+
+### 16. Check Balance for Target Account
+GET {{gateway}}/api/accounts/3
+

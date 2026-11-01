@@ -1,0 +1,90 @@
+server:
+  port: 8080
+
+spring:
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:5173"
+              - "http://127.0.0.1:5173"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders:
+              - "*"
+            allowCredentials: true
+      routes:
+        # User Service Routes
+        - id: user-service-route
+          uri: lb://user-service
+          predicates:
+            - Path=/api/users/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: gatewayCircuitBreaker
+                fallbackUri: forward:/fallback/users
+
+        # Account Service Routes
+        - id: account-service-route
+          uri: lb://account-service
+          predicates:
+            - Path=/api/accounts/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: gatewayCircuitBreaker
+                fallbackUri: forward:/fallback/accounts
+
+        # Transaction Service Routes
+        - id: transaction-service-route
+          uri: lb://transaction-service
+          predicates:
+            - Path=/api/transactions/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: gatewayCircuitBreaker
+                fallbackUri: forward:/fallback/transactions
+
+        # Swagger API Docs aggregation routes
+        - id: user-docs-route
+          uri: lb://user-service
+          predicates:
+            - Path=/v3/api-docs/users
+          filters:
+            - SetPath=/v3/api-docs
+
+        - id: account-docs-route
+          uri: lb://account-service
+          predicates:
+            - Path=/v3/api-docs/accounts
+          filters:
+            - SetPath=/v3/api-docs
+
+        - id: transaction-docs-route
+          uri: lb://transaction-service
+          predicates:
+            - Path=/v3/api-docs/transactions
+          filters:
+            - SetPath=/v3/api-docs
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: Users Service
+        url: /v3/api-docs/users
+      - name: Accounts Service
+        url: /v3/api-docs/accounts
+      - name: Transactions Service
+        url: /v3/api-docs/transactions
+

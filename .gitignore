@@ -1,0 +1,71 @@
+# ====================================================================
+# ADG-Bank Git Ignore Configuration
+# ====================================================================
+
+# AI Agent Workspaces & Local Skills Library
+.agents/
+.gemini/
+GEMINI.md
+AGENTS.md
+
+# Compiled Java Classes & Maven Artifacts
+target/
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Maven Wrapper runtime downloads (keep .mvn/wrapper/maven-wrapper.jar and properties)
+.mvn/wrapper/maven-wrapper.jar
+!mvnw
+!mvnw.cmd
+!.mvn/wrapper/maven-wrapper.properties
+!.mvn/wrapper/MavenWrapperDownloader.java
+
+# Logs & Runtime Diagnostics
+*.log
+logs/
+**/logs/
+
+# In-memory / Local Database Files
+*.db
+*.h2.db
+*.trace.db
+
+# Frontend (Node.js & Bundlers)
+node_modules/
+**/node_modules/
+dist/
+build/
+.next/
+*.tsbuildinfo
+.npm
+.eslintcache
+
+# Environment Variables & Local Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE & Editor Specific Folders
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.settings/
+.classpath
+.project
+.factorypath
+
+# OS Metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
