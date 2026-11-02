@@ -22,7 +22,15 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   onExecuteTransfer,
   preselectedPayee,
 }) => {
-  const currentAccount = accounts.find((a) => a.id === currentAccountId) || accounts[0];
+  const currentAccount = accounts.find((a) => a.id === currentAccountId) || accounts[0] || {
+    id: currentAccountId || 1,
+    balance: 1000,
+    currency: 'EUR',
+    accountNumber: 'ADG0001001',
+    status: 'ACTIVE',
+    userId: 1,
+    createdAt: new Date().toISOString(),
+  };
   const [selectedPayee, setSelectedPayee] = useState<PayeeDTO>(preselectedPayee || mockPayees[0]);
   const [amountStr, setAmountStr] = useState<string>('25');
   const [description, setDescription] = useState<string>('Перевод другу');

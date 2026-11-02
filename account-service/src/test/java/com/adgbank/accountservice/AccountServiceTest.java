@@ -1,6 +1,7 @@
 package com.adgbank.accountservice;
 
 import com.adgbank.accountservice.entity.AccountEntity;
+import com.adgbank.accountservice.exception.AccountNotFoundException;
 import com.adgbank.accountservice.exception.InsufficientFundsException;
 import com.adgbank.accountservice.repository.AccountRepository;
 import com.adgbank.accountservice.service.AccountService;
@@ -96,6 +97,45 @@ class AccountServiceTest {
                 .hasMessageContaining("Insufficient funds");
 
         verify(accountRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should throw IllegalStateException when account is FROZEN")
+    void shouldThrowWhenAccountNotActive() {
+        sampleAccount.setStatus("FROZEN");
+        when(accountRepository.findById(10L)).thenReturn(Optional.of(sampleAccount));
+
+        UpdateBalanceRequest request = new UpdateBalanceRequest(new BigDecimal("100.00"), "CREDIT", "REF_FROZEN");
+
+        assertThatThrownBy(() -> accountService.updateBalance(10L, request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("is not active");
+
+        verify(accountRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should throw IllegalArgumentException when operation type is unsupported")
+    void shouldThrowWhenOperationTypeUnsupported() {
+        when(accountRepository.findById(10L)).thenReturn(Optional.of(sampleAccount));
+
+        UpdateBalanceRequest request = new UpdateBalanceRequest(new BigDecimal("100.00"), "UNKNOWN_OP", "REF_UNKNOWN");
+
+        assertThatThrownBy(() -> accountService.updateBalance(10L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unsupported operation type");
+
+        verify(accountRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should throw AccountNotFoundException when account does not exist")
+    void shouldThrowWhenAccountNotFound() {
+        when(accountRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> accountService.getAccountById(999L))
+                .isInstanceOf(AccountNotFoundException.class)
+                .hasMessageContaining("Account not found with id: 999");
     }
 }
 

@@ -43,6 +43,12 @@ build/
 .npm
 .eslintcache
 
+# Test results & reports
+test-results/
+**/test-results/
+playwright-report/
+**/playwright-report/
+
 # Environment Variables & Local Secrets
 .env
 .env.local

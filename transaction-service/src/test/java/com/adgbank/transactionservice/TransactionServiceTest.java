@@ -6,6 +6,7 @@ import com.adgbank.common.dto.TransactionDto;
 import com.adgbank.common.dto.UpdateBalanceRequest;
 import com.adgbank.transactionservice.client.AccountClient;
 import com.adgbank.transactionservice.entity.TransactionEntity;
+import com.adgbank.transactionservice.exception.TransferExecutionException;
 import com.adgbank.transactionservice.repository.TransactionRepository;
 import com.adgbank.transactionservice.service.TransactionService;
 import org.junit.jupiter.api.BeforeEach;
@@ -118,6 +119,66 @@ class TransactionServiceTest {
         assertThat(fallbackResult).isNotNull();
         assertThat(fallbackResult.status()).isEqualTo("PENDING_FALLBACK");
         assertThat(fallbackResult.description()).contains("Circuit Breaker active");
+    }
+
+    @Test
+    @DisplayName("Should reject transfer when currencies do not match")
+    void shouldRejectWhenCurrencyMismatch() {
+        String key = "idem-currency-mismatch";
+        AccountDto rubAccount = new AccountDto(10L, 1L, "408178101", new BigDecimal("1000.00"), "RUB", "ACTIVE", Instant.now());
+        AccountDto usdAccount = new AccountDto(20L, 2L, "408178401", new BigDecimal("500.00"), "USD", "ACTIVE", Instant.now());
+
+        when(transactionRepository.findByIdempotencyKey(key)).thenReturn(Optional.empty());
+        when(accountClient.getAccountById(10L)).thenReturn(rubAccount);
+        when(accountClient.getAccountById(20L)).thenReturn(usdAccount);
+
+        assertThatThrownBy(() -> transactionService.executeTransfer(transferRequest, key))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Currency mismatch: source account is RUB, target account is USD");
+
+        verify(accountClient, never()).updateBalance(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("Should trigger compensatory credit on source account when target credit fails")
+    void shouldTriggerCompensatoryCreditWhenTargetCreditFails() {
+        String key = "idem-compensation-test";
+        AccountDto sourceAcc = new AccountDto(10L, 1L, "408178101", new BigDecimal("1000.00"), "RUB", "ACTIVE", Instant.now());
+        AccountDto targetAcc = new AccountDto(20L, 2L, "408178102", new BigDecimal("200.00"), "RUB", "ACTIVE", Instant.now());
+
+        when(transactionRepository.findByIdempotencyKey(key)).thenReturn(Optional.empty());
+        when(accountClient.getAccountById(10L)).thenReturn(sourceAcc);
+        when(accountClient.getAccountById(20L)).thenReturn(targetAcc);
+
+        // Debit source succeeds
+        doAnswer(inv -> null).when(accountClient).updateBalance(eq(10L), argThat(r -> "DEBIT".equals(r.operationType())));
+
+        // Credit target fails with exception
+        doThrow(new RuntimeException("Database timeout on target account"))
+                .when(accountClient).updateBalance(eq(20L), argThat(r -> "CREDIT".equals(r.operationType())));
+
+        assertThatThrownBy(() -> transactionService.executeTransfer(transferRequest, key))
+                .isInstanceOf(TransferExecutionException.class)
+                .hasMessageContaining("Transfer failed during credit step");
+
+        // Verify compensatory credit was sent to source account with REVERSAL- prefix
+        verify(accountClient, times(1)).updateBalance(eq(10L), argThat(r ->
+                "CREDIT".equals(r.operationType()) && r.referenceId().startsWith("REVERSAL-idem-compensation-test")
+        ));
+    }
+
+    @Test
+    @DisplayName("Should fail when source or target account is not found in account-service")
+    void shouldFailWhenAccountNotFound() {
+        String key = "idem-missing-acc";
+        when(transactionRepository.findByIdempotencyKey(key)).thenReturn(Optional.empty());
+        when(accountClient.getAccountById(10L)).thenReturn(null);
+
+        assertThatThrownBy(() -> transactionService.executeTransfer(transferRequest, key))
+                .isInstanceOf(TransferExecutionException.class)
+                .hasMessageContaining("One or both accounts could not be retrieved");
+
+        verify(accountClient, never()).updateBalance(anyLong(), any());
     }
 }
 

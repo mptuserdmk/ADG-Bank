@@ -95,14 +95,7 @@ export const RevolutBankApp: React.FC = () => {
   const [cards, setCards] = useState<CardDTO[]>(mockCards);
   const [payees, setPayees] = useState<PayeeDTO[]>(mockPayees);
 
-  // Fetch Accounts Query
-  const { data: accounts = [] } = useQuery({
-    queryKey: ['accounts'],
-    queryFn: () => BankAPI.getAccounts(1),
-  });
-
-  // Current active account
-  const currentAccount: AccountDTO = accounts.find((a) => a.id === selectedAccountId) || accounts[0] || {
+  const defaultAccount: AccountDTO = {
     id: 1,
     userId: 1,
     accountNumber: 'ADG0001001',
@@ -111,6 +104,16 @@ export const RevolutBankApp: React.FC = () => {
     status: 'ACTIVE',
     createdAt: new Date().toISOString(),
   };
+
+  // Fetch Accounts Query with resilient initialData
+  const { data: accounts = [defaultAccount] } = useQuery({
+    queryKey: ['accounts'],
+    queryFn: () => BankAPI.getAccounts(1),
+    initialData: [defaultAccount],
+  });
+
+  // Current active account
+  const currentAccount: AccountDTO = accounts.find((a) => a.id === selectedAccountId) || accounts[0] || defaultAccount;
 
   // Fetch Transactions Query
   const { data: transactions = [], isLoading: isTxLoading } = useQuery({
@@ -331,7 +334,7 @@ export const RevolutBankApp: React.FC = () => {
       <TransferModal
         isOpen={isTransferOpen}
         onClose={() => setIsTransferOpen(false)}
-        accounts={accounts}
+        accounts={accounts.length > 0 ? accounts : [currentAccount]}
         currentAccountId={currentAccount?.id || 1}
         preselectedPayee={selectedPayeeForTransfer}
         onExecuteTransfer={async (req) => {
