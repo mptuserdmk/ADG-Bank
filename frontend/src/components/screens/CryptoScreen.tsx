@@ -1,6 +1,7 @@
 import React from 'react';
-import { Bitcoin, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import type { CryptoCoin } from '../modals/CryptoTradeModal';
+import { motion } from 'framer-motion';
 
 interface CryptoScreenProps {
   onSelectCoin: (coin: CryptoCoin) => void;
@@ -22,20 +23,33 @@ export const CryptoScreen: React.FC<CryptoScreenProps> = ({ onSelectCoin, onExpl
         <p className="text-xs text-revolut-muted">Покупка, продажа и хранение криптоактивов</p>
       </div>
 
-      {/* Crypto Balance Card */}
-      <div 
+      {/* Crypto Balance Card with 3D graphics */}
+      <motion.div 
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.98 }}
         onClick={onExploreClick}
-        className="p-4 rounded-card bg-gradient-to-br from-[#1e1b4b]/60 via-revolut-cardSolid to-transparent border border-white/[0.08] shadow-glass cursor-pointer hover:bg-white/[0.06] transition-all"
+        className="relative p-4 rounded-card bg-gradient-to-br from-[#1e1b4b]/60 via-revolut-cardSolid to-transparent border border-white/[0.08] shadow-glass cursor-pointer overflow-hidden"
       >
-        <span className="text-xs font-semibold text-revolut-muted">Баланс криптовалюты</span>
-        <div className="flex items-baseline gap-2 my-1">
-          <span className="text-3xl font-semibold text-white font-sans tabular-nums">€ 950.40</span>
-          <span className="text-xs font-semibold text-revolut-green flex items-center">
-            <ArrowUpRight className="w-3.5 h-3.5" /> +5.2%
-          </span>
+        <img
+          src="/assets/3d/crypto-coin-3d.png"
+          alt="Crypto 3D Coin"
+          className="absolute -right-1 -bottom-1 w-28 h-28 object-contain drop-shadow-[0_10px_25px_rgba(245,158,11,0.3)] pointer-events-none"
+          onError={(e) => {
+            (e.target as HTMLElement).style.display = 'none';
+          }}
+        />
+
+        <div className="relative z-10">
+          <span className="text-xs font-semibold text-revolut-muted">Баланс криптовалюты</span>
+          <div className="flex items-baseline gap-2 my-1">
+            <span className="text-3xl font-semibold text-white font-sans tabular-nums">€ 950.40</span>
+            <span className="text-xs font-semibold text-revolut-green flex items-center">
+              <ArrowUpRight className="w-3.5 h-3.5" /> +5.2%
+            </span>
+          </div>
+          <p className="text-[11px] text-revolut-muted font-sans tabular-nums">≈ 0.0152 BTC</p>
         </div>
-        <p className="text-[11px] text-revolut-muted font-sans tabular-nums">≈ 0.0152 BTC</p>
-      </div>
+      </motion.div>
 
       {/* Coins List */}
       <div>
@@ -49,35 +63,39 @@ export const CryptoScreen: React.FC<CryptoScreenProps> = ({ onSelectCoin, onExpl
           </button>
         </div>
 
-        <div className="rounded-card bg-white/[0.04] border border-white/[0.06] divide-y divide-white/[0.04]">
+        <div className="rounded-card bg-white/[0.04] border border-white/[0.06] divide-y divide-white/[0.04] overflow-hidden">
           {coins.map((c) => (
-            <button
+            <motion.button
               key={c.symbol}
+              whileTap={{ scale: 0.98 }}
               onClick={() => onSelectCoin(c)}
-              className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] transition-colors text-left group"
+              className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] transition-colors text-left"
             >
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-white/[0.08] flex items-center justify-center text-revolut-orange group-hover:scale-105 transition-transform shadow-inner-light">
-                  <Bitcoin className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-full bg-revolut-purple/20 border border-revolut-purple/30 flex items-center justify-center text-white font-bold text-xs">
+                  {c.symbol}
                 </div>
                 <div>
-                  <p className="text-xs sm:text-sm font-semibold text-white">{c.name}</p>
-                  <p className="text-[11px] text-revolut-muted font-mono">{c.symbol}</p>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-semibold text-white">{c.name}</span>
+                    <span className="text-[10px] text-revolut-muted font-mono">{c.symbol}</span>
+                  </div>
+                  <span className="text-[11px] text-revolut-muted">Крипто</span>
                 </div>
               </div>
 
               <div className="text-right">
-                <p className="text-xs sm:text-sm font-semibold text-white font-sans tabular-nums">
+                <div className="text-sm font-semibold text-white font-sans tabular-nums">
                   €{c.price}
-                </p>
-                <p className={`text-[11px] font-semibold font-sans tabular-nums flex items-center justify-end ${
+                </div>
+                <div className={`text-[11px] font-semibold flex items-center justify-end font-sans tabular-nums ${
                   c.isPos ? 'text-revolut-green' : 'text-red-400'
                 }`}>
                   {c.isPos ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
                   {c.change}
-                </p>
+                </div>
               </div>
-            </button>
+            </motion.button>
           ))}
         </div>
       </div>

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import type { CardDTO } from '../../types/api';
-import { CreditCard, Lock, Unlock, Eye, Plus, ShieldCheck } from 'lucide-react';
+import { InteractiveCard } from '../revolut/InteractiveCard';
+import { Lock, Unlock, Eye, Plus, ShieldCheck, RefreshCw } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface CardsScreenProps {
   cards: CardDTO[];
@@ -18,75 +20,93 @@ export const CardsScreen: React.FC<CardsScreenProps> = ({
   onOpenLimitsClick,
 }) => {
   const [selectedCardIndex, setSelectedCardIndex] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
   const currentCard = cards[selectedCardIndex] || cards[0];
 
   return (
-    <div className="px-4 py-3 space-y-5 animate-fadeIn">
-      {/* Screen Title */}
+    <div className="px-4 py-3 space-y-4 animate-fadeIn">
+      {/* Screen Title & Order Button */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white tracking-tight">Cards</h1>
           <p className="text-xs text-revolut-muted">Физические и виртуальные карты ADG-Bank</p>
         </div>
-        <button 
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
           onClick={onOrderCardClick}
           aria-label="Заказать новую карту"
-          className="flex items-center justify-center w-9 h-9 rounded-full bg-white/[0.08] hover:bg-white/[0.14] border border-white/[0.08] text-white transition-colors active:scale-95 shadow-inner-light"
+          className="flex items-center justify-center w-9 h-9 rounded-full bg-white/[0.08] hover:bg-white/[0.14] border border-white/[0.08] text-white transition-colors shadow-inner-light"
         >
           <Plus className="w-4 h-4" />
-        </button>
+        </motion.button>
       </div>
 
-      {/* Cards Horizontal Carousel */}
-      <div className="flex gap-3 overflow-x-auto no-scrollbar py-2 snap-x snap-mandatory">
-        {cards.map((c, idx) => {
-          const isSelected = selectedCardIndex === idx;
-          return (
-            <div
-              key={c.id}
-              onClick={() => setSelectedCardIndex(idx)}
-              className={`w-[280px] h-[175px] rounded-2xl p-4 flex flex-col justify-between flex-shrink-0 cursor-pointer transition-all snap-center relative shadow-glass border ${
-                isSelected
-                  ? 'ring-2 ring-revolut-blue/80 scale-102 border-transparent'
-                  : 'opacity-70 hover:opacity-90 border-white/[0.08]'
-              }`}
-              style={{ background: c.colorGradient || 'linear-gradient(135deg, #1f2429 0%, #0d0f12 100%)' }}
+      {/* Featured 3D Interactive Card (Tilt + Flip with Glare) */}
+      {currentCard && (
+        <div className="space-y-2">
+          <InteractiveCard
+            card={currentCard}
+            isFlipped={isFlipped}
+            onFlip={() => setIsFlipped(!isFlipped)}
+            onCardClick={() => onOpenCardDetails(currentCard)}
+          />
+
+          {/* Interactive Flip Hint */}
+          <div className="flex justify-center">
+            <button
+              onClick={() => setIsFlipped(!isFlipped)}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-revolut-muted text-[11px] transition-colors"
             >
-              <div className="flex justify-between items-center text-white">
-                <span className="text-[10px] font-bold tracking-widest uppercase opacity-80">
-                  ADG • {c.type}
+              <RefreshCw className={`w-3 h-3 transition-transform duration-300 ${isFlipped ? 'rotate-180' : ''}`} />
+              <span>{isFlipped ? 'Показать лицевую сторону' : 'Перевернуть (CVV код)'}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Card Selector Pills if multiple cards */}
+      {cards.length > 1 && (
+        <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
+          {cards.map((c, idx) => {
+            const isSelected = selectedCardIndex === idx;
+            return (
+              <button
+                key={c.id}
+                onClick={() => {
+                  setSelectedCardIndex(idx);
+                  setIsFlipped(false);
+                }}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                  isSelected
+                    ? 'bg-revolut-blue/20 text-white border-revolut-blue/50'
+                    : 'bg-white/[0.04] text-white/60 border-white/[0.06] hover:text-white'
+                }`}
+              >
+                <div
+                  className="w-2 h-2 rounded-full"
+                  style={{ background: c.colorGradient || '#0666EB' }}
+                />
+                <span className="font-mono">{c.cardNumber.slice(-4)}</span>
+                <span className="text-[10px] opacity-70">
+                  {c.type === 'PHYSICAL' ? 'Metal' : c.type === 'DISPOSABLE' ? 'Cyber' : 'Virtual'}
                 </span>
-                <CreditCard className="w-5 h-5 opacity-90" />
-              </div>
-
-              {/* font-mono strictly for card number */}
-              <div className="text-base font-mono tracking-widest text-white font-semibold">
-                {c.cardNumber}
-              </div>
-
-              <div className="flex justify-between items-end text-white text-[11px]">
-                <div>
-                  <span className="text-[9px] opacity-70 block">Держатель</span>
-                  <span className="font-semibold tracking-wide">{c.cardHolder}</span>
-                </div>
-                <div>
-                  <span className="text-[9px] opacity-70 block">Срок</span>
-                  <span className="font-mono">{c.expiryDate}</span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Selected Card Controls */}
       {currentCard && (
-        <div className="space-y-3 pt-2">
+        <div className="space-y-3 pt-1">
           <div className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.04] border border-white/[0.08]">
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                currentCard.isFrozen ? 'bg-red-500/20 text-red-400' : 'bg-white/[0.08] text-white'
-              }`}>
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  currentCard.isFrozen ? 'bg-red-500/20 text-red-400' : 'bg-white/[0.08] text-white'
+                }`}
+              >
                 {currentCard.isFrozen ? <Lock className="w-5 h-5" /> : <Unlock className="w-5 h-5" />}
               </div>
               <div>
@@ -99,7 +119,8 @@ export const CardsScreen: React.FC<CardsScreenProps> = ({
               </div>
             </div>
 
-            <button
+            <motion.button
+              whileTap={{ scale: 0.95 }}
               onClick={() => onToggleFreeze(currentCard.id)}
               className={`px-4 py-2 rounded-full text-xs font-semibold transition-all shadow-inner-light ${
                 currentCard.isFrozen
@@ -108,14 +129,16 @@ export const CardsScreen: React.FC<CardsScreenProps> = ({
               }`}
             >
               {currentCard.isFrozen ? 'Разблокировать' : 'Заморозить'}
-            </button>
+            </motion.button>
           </div>
 
           {/* Quick Settings Action Row */}
           <div className="grid grid-cols-2 gap-3">
-            <button
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.96 }}
               onClick={() => onOpenCardDetails(currentCard)}
-              className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] transition-all flex items-center gap-3 text-left active:scale-95"
+              className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] transition-all flex items-center gap-3 text-left"
             >
               <div className="w-9 h-9 rounded-full bg-white/[0.08] flex items-center justify-center text-white">
                 <Eye className="w-4 h-4 text-revolut-platinum" />
@@ -124,20 +147,24 @@ export const CardsScreen: React.FC<CardsScreenProps> = ({
                 <span className="text-xs font-semibold text-white block">Реквизиты</span>
                 <span className="text-[10px] text-revolut-muted">Показать CVV и PIN</span>
               </div>
-            </button>
+            </motion.button>
 
-            <button
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.96 }}
               onClick={() => onOpenLimitsClick(currentCard)}
-              className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] transition-all flex items-center gap-3 text-left active:scale-95"
+              className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] transition-all flex items-center gap-3 text-left"
             >
               <div className="w-9 h-9 rounded-full bg-white/[0.08] flex items-center justify-center text-white">
                 <ShieldCheck className="w-4 h-4 text-revolut-green" />
               </div>
               <div>
                 <span className="text-xs font-semibold text-white block">Лимиты</span>
-                <span className="text-[10px] text-revolut-muted font-sans tabular-nums">До €{currentCard.spendingLimit} / мес</span>
+                <span className="text-[10px] text-revolut-muted font-sans tabular-nums">
+                  До €{currentCard.spendingLimit} / мес
+                </span>
               </div>
-            </button>
+            </motion.button>
           </div>
         </div>
       )}

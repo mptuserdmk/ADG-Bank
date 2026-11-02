@@ -1,5 +1,6 @@
 import React from 'react';
 import { Home, LineChart, ArrowLeftRight, Bitcoin, Compass } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export type TabKey = 'home' | 'invest' | 'transfers' | 'crypto' | 'lifestyle';
 
@@ -20,18 +21,28 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onSelectT
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 flex justify-center pointer-events-none pb-safe">
       <div className="w-full max-w-[420px] px-4 pb-3 sm:pb-4 pointer-events-auto">
-        <div className="flex items-center justify-around h-16 rounded-full bg-revolut-cardSolid/90 backdrop-blur-revolut border border-white/[0.08] shadow-float px-2">
+        <div className="flex items-center justify-around h-16 rounded-full bg-revolut-cardSolid/90 backdrop-blur-revolut border border-white/[0.08] shadow-float px-2 relative">
           {tabs.map((t) => {
             const Icon = t.icon;
             const isActive = activeTab === t.key;
             return (
               <button
                 key={t.key}
+                type="button"
                 onClick={() => onSelectTab(t.key)}
-                className={`flex flex-col items-center justify-center flex-1 h-full rounded-full transition-all active:scale-95 ${
+                className={`relative flex flex-col items-center justify-center flex-1 h-full rounded-full transition-colors z-10 ${
                   isActive ? 'text-white' : 'text-revolut-muted hover:text-revolut-platinum'
                 }`}
               >
+                {/* Floating pill indicator with layoutId animation */}
+                {isActive && (
+                  <motion.div
+                    layoutId="activeTabIndicator"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                    className="absolute inset-y-1.5 inset-x-1 rounded-full bg-white/[0.08] border border-white/[0.1] -z-10 shadow-inner"
+                  />
+                )}
+
                 <Icon className={`w-5 h-5 transition-transform ${isActive ? 'scale-110 text-white' : ''}`} />
                 <span className={`text-[10px] mt-1 font-semibold ${isActive ? 'text-white' : 'text-revolut-muted'}`}>
                   {t.label}
@@ -44,4 +55,3 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onSelectT
     </nav>
   );
 };
-

@@ -12,6 +12,7 @@ import type { TabKey } from './components/revolut/BottomTabBar';
 
 import { Toast } from './components/ui/Toast';
 import type { ToastMessage } from './components/ui/Toast';
+import confetti from 'canvas-confetti';
 
 import { TransferModal } from './components/modals/TransferModal';
 import { AddMoneyModal } from './components/modals/AddMoneyModal';
@@ -124,6 +125,13 @@ export const RevolutBankApp: React.FC = () => {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['accounts'] });
       qc.invalidateQueries({ queryKey: ['transactions'] });
+      confetti({
+        particleCount: 75,
+        spread: 60,
+        origin: { y: 0.75 },
+        colors: ['#0666EB', '#984CFF', '#00D09C', '#FFFFFF'],
+        disableForReducedMotion: true,
+      });
       showToast('Перевод успешно выполнен', `${data.merchantName}: ${Math.abs(data.amount)} ${data.currency}`);
     },
     onError: (err: any) => {
@@ -138,6 +146,13 @@ export const RevolutBankApp: React.FC = () => {
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['accounts'] });
       qc.invalidateQueries({ queryKey: ['transactions'] });
+      confetti({
+        particleCount: 85,
+        spread: 70,
+        origin: { y: 0.75 },
+        colors: ['#00D09C', '#0666EB', '#FFD700', '#FFFFFF'],
+        disableForReducedMotion: true,
+      });
       showToast('Баланс пополнен', `+ ${vars.amount} ${currentAccount?.currency} зачислено на счёт`);
     },
     onError: (err: any) => {
@@ -235,12 +250,14 @@ export const RevolutBankApp: React.FC = () => {
               onSeeAllClick={() => setIsStatementOpen(true)}
             />
 
-            {/* Interactive 2x2 Widgets Grid */}
+            {/* Interactive 2x2 Widgets Grid & Wealth Breakdown */}
             <WidgetsGrid
               onCardClick={() => {
-                setSelectedCardForDetails(cards[0]);
+                setActiveTab('cards');
               }}
               onAnalyticsClick={() => setIsAnalyticsOpen(true)}
+              onInvestClick={() => setActiveTab('invest')}
+              onCryptoClick={() => setActiveTab('crypto')}
             />
 
             {/* Horizontal Payees Quick Transfer */}
