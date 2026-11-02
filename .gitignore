@@ -69,3 +69,8 @@ Thumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 
+# Temporary scratch parsers & design assets
+scratch_*/
+design-kit/
+
+
