@@ -19,3 +19,4 @@ foreach ($port in $ports) {
 }
 
 Write-Host "All ADG-Bank microservice ports are now free." -ForegroundColor Green
+

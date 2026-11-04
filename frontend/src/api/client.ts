@@ -21,15 +21,99 @@ export const generateUUID = (): string => {
   });
 };
 
-// Request interceptor for Idempotency Key
-apiClient.interceptors.request.use((config) => {
+const TOKEN_KEY = 'adg_auth_token';
+const USER_KEY = 'adg_user_profile';
+
+export const getStoredToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(TOKEN_KEY);
+};
+
+export const setStoredToken = (token: string, user?: any) => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(TOKEN_KEY, token);
+  if (user) {
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  }
+};
+
+export const clearStoredAuth = () => {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+};
+
+// Automatic handshake to register/login demo customerDylan on live backend
+export const ensureAuthenticated = async (): Promise<string | null> => {
+  const existing = getStoredToken();
+  if (existing) return existing;
+
+  try {
+    const loginRes = await axios.post('/api/users/login', {
+      usernameOrEmail: 'dylan',
+      password: 'DylanPassword123!',
+    });
+    if (loginRes.data?.token) {
+      setStoredToken(loginRes.data.token, loginRes.data);
+      return loginRes.data.token;
+    }
+  } catch (err: any) {
+    // If user does not exist yet (401 or 404), register automatically
+    try {
+      const regRes = await axios.post('/api/users/register', {
+        username: 'dylan',
+        email: 'dylan@adgbank.com',
+        password: 'DylanPassword123!',
+        fullName: 'Dylan E.',
+      });
+      if (regRes.data?.token) {
+        setStoredToken(regRes.data.token, regRes.data);
+        return regRes.data.token;
+      }
+    } catch {
+      // Backend offline or unreachable
+      return null;
+    }
+  }
+  return null;
+};
+
+// Request interceptor: attaches Bearer token & Idempotency Key
+apiClient.interceptors.request.use(async (config) => {
+  let token = getStoredToken();
+  const url = config.url || '';
+  if (!token && !url.includes('/users/login') && !url.includes('/users/register')) {
+    token = await ensureAuthenticated();
+  }
+  if (token) {
+    config.headers.set('Authorization', `Bearer ${token}`);
+  }
+
   if (config.method && ['post', 'put', 'patch', 'delete'].includes(config.method.toLowerCase())) {
-    if (!config.headers['X-Idempotency-Key']) {
-      config.headers['X-Idempotency-Key'] = generateUUID();
+    if (!config.headers.get('X-Idempotency-Key')) {
+      config.headers.set('X-Idempotency-Key', generateUUID());
     }
   }
   return config;
 });
+
+// Response interceptor: auto-retry once on 401 by refreshing token
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      originalRequest._retry = true;
+      clearStoredAuth();
+      const newToken = await ensureAuthenticated();
+      if (newToken) {
+        originalRequest.headers.set('Authorization', `Bearer ${newToken}`);
+        return apiClient(originalRequest);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 // --- In-Memory Mock Store used ONLY when backend services are offline ---
 let isBackendOnline = false;
@@ -195,12 +279,13 @@ export const BankAPI = {
       const res = await apiClient.get<AccountDTO[]>(`/accounts/user/${userId}`);
       if (res.status === 200 && Array.isArray(res.data)) {
         isBackendOnline = true;
-        // If user is new and has no accounts on backend yet, create a default account
+        // If user is new and has no accounts on backend yet, create a default EUR account
         if (res.data.length === 0) {
           try {
             const created = await apiClient.post<AccountDTO>('/accounts', {
               userId,
               currency: 'EUR',
+              initialBalance: 1250.50,
             });
             return [created.data];
           } catch {
@@ -233,7 +318,7 @@ export const BankAPI = {
   transfer: async (req: CreateTransactionRequestDTO): Promise<TransactionDTO> => {
     const key = generateUUID();
     try {
-      const res = await apiClient.post<TransactionDTO>('/transactions/transfer', req, {
+      const res = await apiClient.post<TransactionDTO>('/transactions', req, {
         headers: { 'X-Idempotency-Key': key }
       });
       if (res.status === 200 || res.status === 201) {
@@ -241,7 +326,6 @@ export const BankAPI = {
         return res.data;
       }
     } catch (error: any) {
-      // If error is from real backend (e.g. 400 Bad Request or 422 Insufficient Funds), rethrow!
       if (error.response && error.response.status >= 400 && error.response.status < 500) {
         const message = error.response.data?.message || 'Ошибка валидации банковской операции';
         throw new Error(message);
@@ -273,11 +357,12 @@ export const BankAPI = {
 
   // Quick Top-Up / Add Money
   addMoney: async (accountId: number, amount: number): Promise<AccountDTO> => {
+    const key = generateUUID();
     try {
-      const res = await apiClient.post<AccountDTO>('/accounts/balance', {
-        accountId,
+      const res = await apiClient.put<AccountDTO>(`/accounts/${accountId}/balance`, {
         amount,
         operationType: 'CREDIT',
+        referenceId: key,
       });
       if (res.status === 200) {
         isBackendOnline = true;
@@ -296,7 +381,7 @@ export const BankAPI = {
       mockTransactions = [
         {
           id: Date.now(),
-          idempotencyKey: generateUUID(),
+          idempotencyKey: key,
           sourceAccountId: accountId,
           amount,
           currency: acc.currency,
