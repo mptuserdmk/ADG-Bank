@@ -1,10 +1,11 @@
 import React from 'react';
 import { ModalSheet } from '../ui/ModalSheet';
-import { FileText, CreditCard, Shield, PieChart, Users, HelpCircle, ChevronRight } from 'lucide-react';
+import { FileText, CreditCard, Shield, PieChart, Users, ArrowLeftRight, ChevronRight } from 'lucide-react';
 
 interface HubServicesModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenExchange?: () => void;
   onOpenStatements: () => void;
   onOpenCards: () => void;
   onOpenAnalytics: () => void;
@@ -14,12 +15,27 @@ interface HubServicesModalProps {
 export const HubServicesModal: React.FC<HubServicesModalProps> = ({
   isOpen,
   onClose,
+  onOpenExchange,
   onOpenStatements,
   onOpenCards,
   onOpenAnalytics,
   onOpenSupport,
 }) => {
   const items = [
+    ...(onOpenExchange
+      ? [
+          {
+            title: 'Обмен валют',
+            desc: 'Моментальная конвертация EUR, USD, RUB, GBP по межбанковскому курсу',
+            icon: ArrowLeftRight,
+            color: 'text-emerald-400',
+            action: () => {
+              onClose();
+              onOpenExchange();
+            },
+          },
+        ]
+      : []),
     {
       title: 'Выписки и справки',
       desc: 'Официальные PDF выписки для посольств и налоговой',
@@ -58,33 +74,34 @@ export const HubServicesModal: React.FC<HubServicesModalProps> = ({
     {
       title: 'Чат с поддержкой 24/7',
       desc: 'Круглосуточная помощь финансового эксперта',
-      icon: HelpCircle,
+      icon: Users,
       color: 'text-cyan-400',
       action: onOpenSupport,
     },
   ];
 
   return (
-    <ModalSheet isOpen={isOpen} onClose={onClose} title="Сервисы ADG-Bank">
-      <div className="space-y-2.5">
-        {items.map((item) => {
+    <ModalSheet isOpen={isOpen} onClose={onClose} title="Услуги и сервис">
+      <div className="space-y-2">
+        {items.map((item, idx) => {
           const Icon = item.icon;
           return (
             <button
-              key={item.title}
-              onClick={() => {
-                onClose();
-                item.action();
-              }}
-              className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] transition-all text-left group"
+              key={idx}
+              onClick={item.action}
+              className="w-full p-3.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] flex items-center justify-between transition-colors text-left group"
             >
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-full bg-white/[0.08] flex items-center justify-center text-white shadow-inner-light group-hover:scale-105 transition-transform">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center">
                   <Icon className={`w-5 h-5 ${item.color}`} />
                 </div>
                 <div>
-                  <h4 className="text-xs sm:text-sm font-semibold text-white">{item.title}</h4>
-                  <p className="text-[11px] text-revolut-muted mt-0.5">{item.desc}</p>
+                  <div className="text-sm font-semibold text-white group-hover:text-revolut-blue transition-colors">
+                    {item.title}
+                  </div>
+                  <div className="text-xs text-revolut-muted leading-tight mt-0.5">
+                    {item.desc}
+                  </div>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-revolut-muted group-hover:text-white group-hover:translate-x-0.5 transition-all" />
@@ -95,4 +112,3 @@ export const HubServicesModal: React.FC<HubServicesModalProps> = ({
     </ModalSheet>
   );
 };
-

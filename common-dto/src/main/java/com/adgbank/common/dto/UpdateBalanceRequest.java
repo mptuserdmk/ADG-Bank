@@ -9,13 +9,20 @@ import java.math.BigDecimal;
 
 public record UpdateBalanceRequest(
         @NotNull(message = "Amount is required")
-        @DecimalMin(value = "0.01", message = "Amount must be greater than zero")
+        @DecimalMin(value = "0.00000001", message = "Amount must be greater than zero")
         BigDecimal amount,
 
         @NotBlank(message = "Operation type is required")
         @Pattern(regexp = "^(DEBIT|CREDIT)$", message = "Operation type must be DEBIT or CREDIT")
         String operationType,
 
-        String referenceId
-) {}
+        String referenceId,
 
+        String pqcSignature,
+
+        String canonicalPayload
+) {
+    public UpdateBalanceRequest(BigDecimal amount, String operationType, String referenceId) {
+        this(amount, operationType, referenceId, null, null);
+    }
+}

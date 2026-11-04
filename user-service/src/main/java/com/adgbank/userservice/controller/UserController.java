@@ -1,6 +1,9 @@
 package com.adgbank.userservice.controller;
 
+import com.adgbank.common.dto.AuthResponse;
 import com.adgbank.common.dto.CreateUserRequest;
+import com.adgbank.common.dto.LoginRequest;
+import com.adgbank.common.dto.RegisterRequest;
 import com.adgbank.common.dto.UserDto;
 import com.adgbank.userservice.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,7 +17,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
-@Tag(name = "Users", description = "Customer profile management operations")
+@Tag(name = "Users & Authentication", description = "Customer profile management and JWT authentication")
 public class UserController {
 
     private final UserService userService;
@@ -23,8 +26,22 @@ public class UserController {
         this.userService = userService;
     }
 
+    @PostMapping("/register")
+    @Operation(summary = "Register customer with password", description = "Registers customer, hashes password with BCrypt and returns signed JWT access token")
+    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+        AuthResponse response = userService.register(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/login")
+    @Operation(summary = "Authenticate customer", description = "Verifies username/email and password, returns signed JWT access token")
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+        AuthResponse response = userService.login(request);
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping
-    @Operation(summary = "Register a new customer", description = "Creates a new bank customer profile with unique username and email")
+    @Operation(summary = "Create customer profile (Admin/Internal)", description = "Creates a new bank customer profile")
     public ResponseEntity<UserDto> createUser(@Valid @RequestBody CreateUserRequest request) {
         UserDto created = userService.createUser(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
@@ -48,4 +65,3 @@ public class UserController {
         return ResponseEntity.ok(userService.getUserByUsername(username));
     }
 }
-

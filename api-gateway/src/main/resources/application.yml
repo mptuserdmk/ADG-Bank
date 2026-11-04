@@ -54,6 +54,42 @@ spring:
                 name: gatewayCircuitBreaker
                 fallbackUri: forward:/fallback/transactions
 
+        # PQC Vault Service Routes
+        - id: pqc-vault-service-route
+          uri: lb://pqc-vault-service
+          predicates:
+            - Path=/api/v1/vault/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: gatewayCircuitBreaker
+                fallbackUri: forward:/fallback/vault
+
+        # Market Rate Service Routes
+        - id: market-rate-service-route
+          uri: lb://market-rate-service
+          predicates:
+            - Path=/api/v1/rates/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: gatewayCircuitBreaker
+                fallbackUri: forward:/fallback/rates
+
+        - id: pqc-vault-docs-route
+          uri: lb://pqc-vault-service
+          predicates:
+            - Path=/v3/api-docs/vault
+          filters:
+            - SetPath=/v3/api-docs
+
+        - id: market-rate-docs-route
+          uri: lb://market-rate-service
+          predicates:
+            - Path=/v3/api-docs/rates
+          filters:
+            - SetPath=/v3/api-docs
+
         - id: user-docs-route
           uri: lb://user-service
           predicates:
@@ -98,4 +134,8 @@ springdoc:
         url: /v3/api-docs/accounts
       - name: Transactions Service
         url: /v3/api-docs/transactions
+      - name: PQC Vault Service
+        url: /v3/api-docs/vault
+      - name: Market Rate Service
+        url: /v3/api-docs/rates
 

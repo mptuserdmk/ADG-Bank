@@ -46,6 +46,28 @@ public class GatewayFallbackController {
         )));
     }
 
+    @RequestMapping("/vault")
+    public Mono<ResponseEntity<Map<String, Object>>> vaultFallback() {
+        return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                "status", HttpStatus.SERVICE_UNAVAILABLE.value(),
+                "error", "Service Unavailable",
+                "message", "PQC Vault Service is currently unreachable. Gateway Circuit Breaker engaged.",
+                "service", "pqc-vault-service",
+                "timestamp", Instant.now().toString()
+        )));
+    }
+
+    @RequestMapping("/rates")
+    public Mono<ResponseEntity<Map<String, Object>>> ratesFallback() {
+        return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                "status", HttpStatus.SERVICE_UNAVAILABLE.value(),
+                "error", "Service Unavailable",
+                "message", "Market Rate Service is currently unreachable. Gateway Circuit Breaker engaged.",
+                "service", "market-rate-service",
+                "timestamp", Instant.now().toString()
+        )));
+    }
+
     @RequestMapping("/common")
     public Mono<ResponseEntity<Map<String, Object>>> commonFallback() {
         return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
@@ -56,4 +78,3 @@ public class GatewayFallbackController {
         )));
     }
 }
-

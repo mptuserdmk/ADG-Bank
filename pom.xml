@@ -22,6 +22,9 @@
         <java.version>21</java.version>
         <spring-cloud.version>2023.0.3</spring-cloud.version>
         <springdoc.version>2.6.0</springdoc.version>
+        <postgresql.version>42.7.4</postgresql.version>
+        <bouncycastle.version>1.78.1</bouncycastle.version>
+        <jjwt.version>0.12.6</jjwt.version>
     </properties>
 
     <modules>
@@ -32,6 +35,8 @@
         <module>user-service</module>
         <module>account-service</module>
         <module>transaction-service</module>
+        <module>pqc-vault-service</module>
+        <module>market-rate-service</module>
     </modules>
 
     <dependencyManagement>
@@ -50,6 +55,44 @@
                 <groupId>com.adgbank</groupId>
                 <artifactId>common-dto</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+
+            <!-- PostgreSQL Driver -->
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${postgresql.version}</version>
+            </dependency>
+
+            <!-- Bouncy Castle Post-Quantum Cryptography -->
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcprov-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcpkix-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+
+            <!-- JJWT (Java JWT) 0.12.x -->
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-api</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>${jjwt.version}</version>
+                <scope>runtime</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-jackson</artifactId>
+                <version>${jjwt.version}</version>
+                <scope>runtime</scope>
             </dependency>
 
             <!-- SpringDoc OpenAPI -->

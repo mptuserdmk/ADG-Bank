@@ -2,9 +2,14 @@ package com.adgbank.transactionservice.service;
 
 import com.adgbank.common.dto.AccountDto;
 import com.adgbank.common.dto.CreateTransactionRequest;
+import com.adgbank.common.dto.MarketConversionResponse;
+import com.adgbank.common.dto.PqcSignRequest;
+import com.adgbank.common.dto.PqcSignResponse;
 import com.adgbank.common.dto.TransactionDto;
 import com.adgbank.common.dto.UpdateBalanceRequest;
 import com.adgbank.transactionservice.client.AccountClient;
+import com.adgbank.transactionservice.client.MarketRateClient;
+import com.adgbank.transactionservice.client.PqcVaultClient;
 import com.adgbank.transactionservice.entity.TransactionEntity;
 import com.adgbank.transactionservice.exception.TransactionNotFoundException;
 import com.adgbank.transactionservice.exception.TransferExecutionException;
@@ -16,7 +21,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -29,10 +33,17 @@ public class TransactionService {
 
     private final TransactionRepository transactionRepository;
     private final AccountClient accountClient;
+    private final MarketRateClient marketRateClient;
+    private final PqcVaultClient pqcVaultClient;
 
-    public TransactionService(TransactionRepository transactionRepository, AccountClient accountClient) {
+    public TransactionService(TransactionRepository transactionRepository,
+                              AccountClient accountClient,
+                              MarketRateClient marketRateClient,
+                              PqcVaultClient pqcVaultClient) {
         this.transactionRepository = transactionRepository;
         this.accountClient = accountClient;
+        this.marketRateClient = marketRateClient;
+        this.pqcVaultClient = pqcVaultClient;
     }
 
     public List<TransactionDto> getAllTransactions() {
@@ -71,9 +82,7 @@ public class TransactionService {
             return toDto(existing.get());
         }
 
-        BigDecimal transferAmount = request.amount().setScale(2, RoundingMode.HALF_EVEN);
-
-        // 1. Verify accounts existence and matching currencies via Feign
+        // 1. Verify existence of both accounts via account-service
         AccountDto sourceAccount = accountClient.getAccountById(request.sourceAccountId());
         AccountDto targetAccount = accountClient.getAccountById(request.targetAccountId());
 
@@ -81,26 +90,77 @@ public class TransactionService {
             throw new TransferExecutionException("One or both accounts could not be retrieved from account-service");
         }
 
-        if (!sourceAccount.currency().equalsIgnoreCase(targetAccount.currency())) {
-            throw new IllegalArgumentException(String.format(
-                    "Currency mismatch: source account is %s, target account is %s. Multi-currency transfers not supported yet.",
-                    sourceAccount.currency(), targetAccount.currency()
-            ));
+        BigDecimal transferAmount = TransactionEntity.scaleAmount(request.amount(), sourceAccount.currency());
+
+        // 2. Multi-currency calculation
+        BigDecimal targetAmount;
+        BigDecimal exchangeRate;
+
+        if (sourceAccount.currency().equalsIgnoreCase(targetAccount.currency())) {
+            targetAmount = transferAmount;
+            exchangeRate = BigDecimal.ONE;
+        } else {
+            log.info("Multi-currency transfer requested from {} to {}", sourceAccount.currency(), targetAccount.currency());
+            try {
+                MarketConversionResponse conversion = marketRateClient.convert(
+                        sourceAccount.currency(),
+                        targetAccount.currency(),
+                        transferAmount
+                );
+                targetAmount = conversion.convertedAmount();
+                exchangeRate = conversion.rate();
+                log.info("Currency converted: {} {} -> {} {} (rate: {})",
+                        transferAmount, sourceAccount.currency(), targetAmount, targetAccount.currency(), exchangeRate);
+            } catch (Exception ex) {
+                log.error("Failed to fetch exchange rate from market-rate-service: {}", ex.getMessage(), ex);
+                throw new TransferExecutionException("Currency conversion failed: " + ex.getMessage(), ex);
+            }
         }
 
-        // 2. Perform atomic debit and credit
+        // 3. Post-quantum cryptographic signing with CRYSTALS-Dilithium3
+        String canonicalPayload = request.sourceAccountId() + ":" + request.targetAccountId() + ":" + transferAmount + ":" + effectiveIdempotencyKey;
+        String pqcSignature = null;
+
+        if (sourceAccount.pqcKeyId() != null && !sourceAccount.pqcKeyId().isBlank()) {
+            try {
+                log.info("Signing transaction payload with Dilithium3 via pqc-vault-service (keyId: {})", sourceAccount.pqcKeyId());
+                PqcSignResponse signResponse = pqcVaultClient.sign(new PqcSignRequest(
+                        UUID.fromString(sourceAccount.pqcKeyId()),
+                        canonicalPayload
+                ));
+                if (signResponse != null && signResponse.signature() != null) {
+                    pqcSignature = signResponse.signature();
+                    log.info("Dilithium3 signature successfully obtained (length: {} chars)", pqcSignature.length());
+                }
+            } catch (Exception ex) {
+                log.warn("PQC signing via pqc-vault-service failed ({}: {}). Continuing without quantum signature.",
+                        ex.getClass().getSimpleName(), ex.getMessage());
+            }
+        }
+
+        // 4. Atomic DEBIT step (with PQC signature and canonical payload)
         accountClient.updateBalance(
                 request.sourceAccountId(),
-                new UpdateBalanceRequest(transferAmount, "DEBIT", "TXN-" + effectiveIdempotencyKey)
+                new UpdateBalanceRequest(
+                        transferAmount,
+                        "DEBIT",
+                        "TXN-" + effectiveIdempotencyKey,
+                        pqcSignature,
+                        canonicalPayload
+                )
         );
 
+        // 5. Atomic CREDIT step
         try {
             accountClient.updateBalance(
                     request.targetAccountId(),
-                    new UpdateBalanceRequest(transferAmount, "CREDIT", "TXN-" + effectiveIdempotencyKey)
+                    new UpdateBalanceRequest(
+                            targetAmount,
+                            "CREDIT",
+                            "TXN-" + effectiveIdempotencyKey
+                    )
             );
         } catch (Exception ex) {
-            // Rollback debit on credit failure
             log.error("Failed to credit target account {}, attempting compensatory credit to source {}",
                     request.targetAccountId(), request.sourceAccountId(), ex);
             try {
@@ -114,19 +174,25 @@ public class TransactionService {
             throw new TransferExecutionException("Transfer failed during credit step: " + ex.getMessage(), ex);
         }
 
-        // 3. Persist successful transaction record
+        // 6. Persist completed transaction audit trail
         TransactionEntity entity = new TransactionEntity(
                 effectiveIdempotencyKey,
                 request.sourceAccountId(),
                 request.targetAccountId(),
                 transferAmount,
                 sourceAccount.currency(),
+                targetAmount,
+                targetAccount.currency(),
+                exchangeRate,
+                pqcSignature,
+                canonicalPayload,
                 "SUCCESS",
-                request.description() != null ? request.description() : "Standard money transfer"
+                request.description() != null ? request.description() : "Quantum-secured money transfer"
         );
 
         TransactionEntity saved = transactionRepository.save(entity);
-        log.info("Transfer completed successfully: id={}, amount={} {}", saved.getId(), transferAmount, sourceAccount.currency());
+        log.info("Transfer completed successfully: id={}, source={} {}, target={} {}, rate={}",
+                saved.getId(), transferAmount, sourceAccount.currency(), targetAmount, targetAccount.currency(), exchangeRate);
         return toDto(saved);
     }
 
@@ -148,7 +214,7 @@ public class TransactionService {
                 request.amount(),
                 "RUB",
                 "PENDING_FALLBACK",
-                "Circuit Breaker active: account-service is temporarily unavailable (" + throwable.getClass().getSimpleName() + "). Transfer deferred."
+                "Circuit Breaker active: downstream service is temporarily unavailable (" + throwable.getClass().getSimpleName() + "). Transfer deferred."
         );
 
         TransactionEntity saved = transactionRepository.save(fallbackEntity);
@@ -165,8 +231,11 @@ public class TransactionService {
                 entity.getCurrency(),
                 entity.getStatus(),
                 entity.getDescription(),
-                entity.getCreatedAt()
+                entity.getCreatedAt(),
+                entity.getTargetAmount(),
+                entity.getTargetCurrency(),
+                entity.getExchangeRate(),
+                entity.getPqcSignature()
         );
     }
 }
-

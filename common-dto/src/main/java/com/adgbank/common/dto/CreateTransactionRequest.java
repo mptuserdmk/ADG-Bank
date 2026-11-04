@@ -13,9 +13,8 @@ public record CreateTransactionRequest(
         Long targetAccountId,
 
         @NotNull(message = "Amount is required")
-        @DecimalMin(value = "0.01", message = "Transfer amount must be at least 0.01")
+        @DecimalMin(value = "0.00000001", message = "Transfer amount must be greater than zero")
         BigDecimal amount,
 
         String description
 ) {}
-

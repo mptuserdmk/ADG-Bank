@@ -19,14 +19,17 @@ public class AccountEntity {
     @Column(name = "account_number", nullable = false, unique = true, length = 34)
     private String accountNumber;
 
-    @Column(nullable = false, precision = 19, scale = 2)
+    @Column(nullable = false, precision = 24, scale = 8)
     private BigDecimal balance;
 
-    @Column(nullable = false, length = 3)
+    @Column(nullable = false, length = 10)
     private String currency;
 
     @Column(nullable = false, length = 20)
     private String status;
+
+    @Column(name = "pqc_key_id", length = 64)
+    private String pqcKeyId;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -34,12 +37,25 @@ public class AccountEntity {
     public AccountEntity() {}
 
     public AccountEntity(Long userId, String accountNumber, BigDecimal balance, String currency, String status) {
+        this(userId, accountNumber, balance, currency, status, null);
+    }
+
+    public AccountEntity(Long userId, String accountNumber, BigDecimal balance, String currency, String status, String pqcKeyId) {
         this.userId = userId;
         this.accountNumber = accountNumber;
-        this.balance = balance != null ? balance.setScale(2, RoundingMode.HALF_EVEN) : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_EVEN);
-        this.currency = currency;
+        this.currency = currency != null ? currency.toUpperCase() : "EUR";
+        this.balance = scaleAmount(balance, this.currency);
         this.status = status;
+        this.pqcKeyId = pqcKeyId;
         this.createdAt = Instant.now();
+    }
+
+    public static BigDecimal scaleAmount(BigDecimal amount, String currency) {
+        int scale = "BTC".equalsIgnoreCase(currency) ? 8 : 2;
+        if (amount == null) {
+            return BigDecimal.ZERO.setScale(scale, RoundingMode.HALF_EVEN);
+        }
+        return amount.setScale(scale, RoundingMode.HALF_EVEN);
     }
 
     @PrePersist
@@ -47,11 +63,7 @@ public class AccountEntity {
         if (this.createdAt == null) {
             this.createdAt = Instant.now();
         }
-        if (this.balance == null) {
-            this.balance = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_EVEN);
-        } else {
-            this.balance = this.balance.setScale(2, RoundingMode.HALF_EVEN);
-        }
+        this.balance = scaleAmount(this.balance, this.currency);
     }
 
     public Long getId() {
@@ -83,7 +95,7 @@ public class AccountEntity {
     }
 
     public void setBalance(BigDecimal balance) {
-        this.balance = balance != null ? balance.setScale(2, RoundingMode.HALF_EVEN) : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_EVEN);
+        this.balance = scaleAmount(balance, this.currency);
     }
 
     public String getCurrency() {
@@ -102,6 +114,14 @@ public class AccountEntity {
         this.status = status;
     }
 
+    public String getPqcKeyId() {
+        return pqcKeyId;
+    }
+
+    public void setPqcKeyId(String pqcKeyId) {
+        this.pqcKeyId = pqcKeyId;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -110,4 +130,3 @@ public class AccountEntity {
         this.createdAt = createdAt;
     }
 }
-

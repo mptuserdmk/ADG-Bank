@@ -12,10 +12,9 @@ public record CreateAccountRequest(
         Long userId,
 
         @NotBlank(message = "Currency is required")
-        @Pattern(regexp = "^(RUB|USD|EUR)$", message = "Currency must be RUB, USD, or EUR")
+        @Pattern(regexp = "^(RUB|USD|EUR|BTC|USDT)$", message = "Currency must be RUB, USD, EUR, BTC, or USDT")
         String currency,
 
         @DecimalMin(value = "0.00", message = "Initial deposit cannot be negative")
         BigDecimal initialDeposit
 ) {}
-

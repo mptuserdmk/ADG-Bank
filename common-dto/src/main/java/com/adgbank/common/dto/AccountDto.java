@@ -10,6 +10,10 @@ public record AccountDto(
         BigDecimal balance,
         String currency,
         String status,
-        Instant createdAt
-) {}
-
+        Instant createdAt,
+        String pqcKeyId
+) {
+    public AccountDto(Long id, Long userId, String accountNumber, BigDecimal balance, String currency, String status, Instant createdAt) {
+        this(id, userId, accountNumber, balance, currency, status, createdAt, null);
+    }
+}

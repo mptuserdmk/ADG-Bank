@@ -29,6 +29,7 @@ import { CardLimitsModal } from './components/modals/CardLimitsModal';
 import { CardDetailsModal } from './components/modals/CardDetailsModal';
 import { TransactionDetailsModal } from './components/modals/TransactionDetailsModal';
 import { AccountSwitcherModal } from './components/modals/AccountSwitcherModal';
+import { UserProfileModal } from './components/modals/UserProfileModal';
 
 import { StockTradeModal } from './components/modals/StockTradeModal';
 import type { StockItem } from './components/modals/StockTradeModal';
@@ -85,6 +86,7 @@ export const RevolutBankApp: React.FC = () => {
   const [selectedTxForDetails, setSelectedTxForDetails] = useState<TransactionDTO | null>(null);
   const [selectedCardForDetails, setSelectedCardForDetails] = useState<CardDTO | null>(null);
   const [isAccountSwitcherOpen, setIsAccountSwitcherOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   // Trade modals state
   const [selectedStock, setSelectedStock] = useState<StockItem | null>(null);
@@ -221,24 +223,27 @@ export const RevolutBankApp: React.FC = () => {
         onSearch={setSearchQuery}
         onOpenAnalytics={() => setIsAnalyticsOpen(true)}
         onOpenQR={() => setIsQROpen(true)}
-        onProfileClick={() => setIsAccountSwitcherOpen(true)}
+        onProfileClick={() => setIsProfileOpen(true)}
       />
 
       {/* Main Tab Views */}
       <main className="flex-1">
         {activeTab === 'home' && (
           <div className="space-y-1 animate-fadeIn">
-            {/* Account Hero with Formatted Balance & 4 Pill Actions */}
+            {/* Account Hero with Formatted Balance, Swipeable Cards Carousel & 4 Pill Actions */}
             <AccountHero
               balance={currentAccount?.balance || 0}
               currency={currentAccount?.currency || 'EUR'}
               accountName={`${currentAccount?.currency} Account`}
               accountsCount={accounts.length}
+              cards={cards}
               onSelectAccountClick={() => setIsAccountSwitcherOpen(true)}
               onAddMoney={() => setIsAddMoneyOpen(true)}
-              onExchange={() => setIsExchangeOpen(true)}
+              onTransfer={() => setIsTransferOpen(true)}
               onDetails={() => setIsAccountDetailsOpen(true)}
               onMore={() => setIsHubOpen(true)}
+              onOpenCardDetails={(c) => setSelectedCardForDetails(c)}
+              onOrderCard={() => setIsOrderCardOpen(true)}
             />
 
             {/* Revolut Marketing Promo Banner */}
@@ -372,6 +377,7 @@ export const RevolutBankApp: React.FC = () => {
       <HubServicesModal
         isOpen={isHubOpen}
         onClose={() => setIsHubOpen(false)}
+        onOpenExchange={() => setIsExchangeOpen(true)}
         onOpenStatements={() => setIsStatementOpen(true)}
         onOpenCards={() => setActiveTab('cards')}
         onOpenAnalytics={() => setIsAnalyticsOpen(true)}
@@ -478,6 +484,14 @@ export const RevolutBankApp: React.FC = () => {
         onClose={() => setSelectedPerk(null)}
         perk={selectedPerk}
         onActivateSuccess={(msg) => showToast('Привилегия активна', msg)}
+      />
+
+      {/* 19. User Profile Modal Sheet */}
+      <UserProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        onOpenExchange={() => setIsExchangeOpen(true)}
+        onLogout={() => showToast('Выход выполнен', 'Сессия пользователя завершена', 'info')}
       />
     </DesktopShell>
   );

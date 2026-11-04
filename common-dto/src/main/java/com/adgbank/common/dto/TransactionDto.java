@@ -12,6 +12,15 @@ public record TransactionDto(
         String currency,
         String status,
         String description,
-        Instant createdAt
-) {}
-
+        Instant createdAt,
+        BigDecimal targetAmount,
+        String targetCurrency,
+        BigDecimal exchangeRate,
+        String pqcSignature
+) {
+    public TransactionDto(Long id, String idempotencyKey, Long sourceAccountId, Long targetAccountId,
+                          BigDecimal amount, String currency, String status, String description, Instant createdAt) {
+        this(id, idempotencyKey, sourceAccountId, targetAccountId, amount, currency, status, description, createdAt,
+                amount, currency, BigDecimal.ONE, null);
+    }
+}
