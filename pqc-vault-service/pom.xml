@@ -70,11 +70,11 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- In-memory H2 fallback for tests -->
+        <!-- In-memory H2 fallback for local and test run -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
-            <scope>test</scope>
+            <scope>runtime</scope>
         </dependency>
 
         <!-- Bouncy Castle Low-Level PQC -->
