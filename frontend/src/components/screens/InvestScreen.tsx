@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import type { StockItem } from '../modals/StockTradeModal';
+import { BankAPI } from '../../api/client';
 import { motion } from 'framer-motion';
 
 interface InvestScreenProps {
@@ -15,6 +16,14 @@ export const InvestScreen: React.FC<InvestScreenProps> = ({ onSelectStock, onExp
     { ticker: 'TSLA', name: 'Tesla Inc.', price: '172.60', change: '-0.95%', isPos: false },
     { ticker: 'MSFT', name: 'Microsoft', price: '420.55', change: '+0.75%', isPos: true },
   ];
+
+  const holdings = BankAPI.getStockHoldings();
+
+  const totalPortfolioValue = stocks.reduce((acc, s) => {
+    const shares = holdings[s.ticker]?.shares || 0;
+    const price = parseFloat(s.price) || 0;
+    return acc + shares * price;
+  }, 0);
 
   return (
     <div className="px-4 py-3 space-y-4 animate-fadeIn">
@@ -44,7 +53,9 @@ export const InvestScreen: React.FC<InvestScreenProps> = ({ onSelectStock, onExp
         <div className="relative z-10">
           <span className="text-xs font-semibold text-revolut-muted">Инвестиционный портфель</span>
           <div className="flex items-baseline gap-2 my-1">
-            <span className="text-3xl font-semibold text-white font-sans tabular-nums">€ 4,820.50</span>
+            <span className="text-3xl font-semibold text-white font-sans tabular-nums">
+              $ {totalPortfolioValue.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
             <span className="text-xs font-semibold text-revolut-green flex items-center">
               <ArrowUpRight className="w-3.5 h-3.5" /> +12.4%
             </span>

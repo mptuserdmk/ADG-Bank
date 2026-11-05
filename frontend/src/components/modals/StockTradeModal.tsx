@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ModalSheet } from '../ui/ModalSheet';
-import { Check, ArrowRight } from 'lucide-react';
+import { Check, ArrowRight, AlertCircle } from 'lucide-react';
 
 export interface StockItem {
   ticker: string;
@@ -14,37 +14,53 @@ interface StockTradeModalProps {
   stock: StockItem | null;
   isOpen: boolean;
   onClose: () => void;
-  onBuySuccess?: (msg: string) => void;
+  availableBalance?: number;
+  currency?: string;
+  onExecuteBuy?: (stock: StockItem, shares: number, totalCost: number) => Promise<void>;
 }
 
 export const StockTradeModal: React.FC<StockTradeModalProps> = ({
   stock,
   isOpen,
   onClose,
-  onBuySuccess,
+  availableBalance = 1000,
+  currency = 'EUR',
+  onExecuteBuy,
 }) => {
   const [shares, setShares] = useState<string>('1');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   if (!stock) return null;
 
   const count = parseFloat(shares) || 0;
   const singlePrice = parseFloat(stock.price) || 0;
-  const totalCost = (count * singlePrice).toFixed(2);
+  const totalCost = parseFloat((count * singlePrice).toFixed(2));
 
-  const handleBuy = () => {
+  const handleBuy = async () => {
     if (count <= 0) return;
+    if (totalCost > availableBalance) {
+      setErrorMsg(`Недостаточно средств. Доступно: €${availableBalance.toFixed(2)}`);
+      return;
+    }
+
+    setErrorMsg('');
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      if (onExecuteBuy) {
+        await onExecuteBuy(stock, count, totalCost);
+      }
       setIsSuccess(true);
-      onBuySuccess?.(`Успешно куплено ${count} шт. ${stock.ticker} на $${totalCost}`);
       setTimeout(() => {
         setIsSuccess(false);
         onClose();
-      }, 1400);
-    }, 700);
+      }, 1600);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Ошибка исполнения ордера');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -55,8 +71,11 @@ export const StockTradeModal: React.FC<StockTradeModalProps> = ({
             <Check className="w-8 h-8" />
           </div>
           <h4 className="text-lg font-bold text-white mb-1">Сделка исполнена</h4>
-          <p className="text-xs text-revolut-muted font-sans tabular-nums">
-            Куплено {count} шт. {stock.ticker} по цене ${stock.price}
+          <p className="text-sm font-semibold text-white mt-1 font-sans tabular-nums">
+            Куплено +{count} шт. {stock.ticker}
+          </p>
+          <p className="text-xs text-revolut-muted mt-0.5 font-sans tabular-nums">
+            Списано €{totalCost.toFixed(2)} со счёта
           </p>
         </div>
       ) : (
@@ -74,7 +93,12 @@ export const StockTradeModal: React.FC<StockTradeModalProps> = ({
 
           {/* Shares input */}
           <div className="p-3.5 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-between">
-            <span className="text-xs font-semibold text-white">Количество акций</span>
+            <div>
+              <span className="text-xs font-semibold text-white block">Количество акций</span>
+              <span className="text-[11px] text-revolut-muted font-sans tabular-nums">
+                Баланс: {currency === 'RUB' ? '₽' : currency === 'USD' ? '$' : '€'}{availableBalance.toFixed(2)}
+              </span>
+            </div>
             <input
               type="number"
               min="0.1"
@@ -87,15 +111,22 @@ export const StockTradeModal: React.FC<StockTradeModalProps> = ({
 
           <div className="flex justify-between items-center text-xs px-1">
             <span className="text-revolut-muted">Итоговая сумма сделки</span>
-            <span className="text-sm font-bold text-white font-sans tabular-nums">${totalCost}</span>
+            <span className="text-sm font-bold text-white font-sans tabular-nums">${totalCost.toFixed(2)}</span>
           </div>
+
+          {errorMsg && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
 
           <button
             onClick={handleBuy}
-            disabled={isSubmitting || count <= 0}
-            className="w-full h-12 rounded-full bg-revolut-green hover:bg-emerald-500 text-white font-semibold text-sm transition-all flex items-center justify-center gap-2 active:scale-98 shadow-inner-light mt-2"
+            disabled={isSubmitting || count <= 0 || totalCost > availableBalance}
+            className="w-full h-12 rounded-full bg-revolut-green hover:bg-emerald-500 text-white font-semibold text-sm transition-all flex items-center justify-center gap-2 active:scale-98 disabled:opacity-50 shadow-inner-light mt-2"
           >
-            <span>{isSubmitting ? 'Исполнение ордера...' : `Купить ${stock.ticker} за $${totalCost}`}</span>
+            <span>{isSubmitting ? 'Исполнение ордера...' : `Купить ${stock.ticker} за $${totalCost.toFixed(2)}`}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

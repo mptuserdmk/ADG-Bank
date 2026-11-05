@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ModalSheet } from '../ui/ModalSheet';
 import type { AccountDTO } from '../../types/api';
 import { getCurrencyParts } from '../../utils/currency';
-import { Check, Plus, Wallet } from 'lucide-react';
+import { Check, Plus, Wallet, ArrowRight } from 'lucide-react';
 
 interface AccountSwitcherModalProps {
   accounts: AccountDTO[];
@@ -10,7 +10,7 @@ interface AccountSwitcherModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectAccount: (accountId: number) => void;
-  onAddNewAccount: () => void;
+  onAddNewAccount: (currency: string) => Promise<void> | void;
 }
 
 export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
@@ -21,6 +21,23 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
   onSelectAccount,
   onAddNewAccount,
 }) => {
+  const [isOpeningForm, setIsOpeningForm] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState('USD');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const availableCurrencies = ['USD', 'EUR', 'RUB', 'BTC', 'GBP'];
+
+  const handleCreateAccount = async () => {
+    setIsSubmitting(true);
+    try {
+      await onAddNewAccount(selectedCurrency);
+      setIsOpeningForm(false);
+      onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <ModalSheet isOpen={isOpen} onClose={onClose} title="Счета и балансы">
       <div className="space-y-3">
@@ -67,16 +84,56 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
           );
         })}
 
-        <button
-          onClick={() => {
-            onAddNewAccount();
-            onClose();
-          }}
-          className="w-full h-11 rounded-full border border-dashed border-white/20 hover:border-white/40 flex items-center justify-center gap-2 text-xs font-semibold text-revolut-platinum hover:text-white transition-all mt-3"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Открыть новый счёт</span>
-        </button>
+        {isOpeningForm ? (
+          <div className="p-4 rounded-2xl bg-white/[0.05] border border-white/[0.1] space-y-3 mt-3 animate-fadeIn">
+            <span className="text-xs font-semibold text-revolut-muted block">
+              Выберите валюту нового счета
+            </span>
+            <div className="grid grid-cols-5 gap-1.5">
+              {availableCurrencies.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setSelectedCurrency(c)}
+                  className={`py-2 rounded-xl text-xs font-bold border transition-all ${
+                    selectedCurrency === c
+                      ? 'bg-revolut-blue border-revolut-blue text-white shadow-inner-light'
+                      : 'bg-white/[0.04] border-white/[0.08] text-revolut-muted hover:text-white'
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsOpeningForm(false)}
+                className="flex-1 h-10 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-xs font-semibold text-white transition-all"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateAccount}
+                disabled={isSubmitting}
+                className="flex-1 h-10 rounded-xl bg-revolut-blue hover:bg-revolut-blueHover text-xs font-semibold text-white transition-all flex items-center justify-center gap-1.5 shadow-inner-light"
+              >
+                <span>{isSubmitting ? 'Открытие...' : `Открыть ${selectedCurrency}`}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setIsOpeningForm(true)}
+            className="w-full h-11 rounded-full border border-dashed border-white/20 hover:border-white/40 flex items-center justify-center gap-2 text-xs font-semibold text-revolut-platinum hover:text-white transition-all mt-3"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Открыть новый счёт</span>
+          </button>
+        )}
       </div>
     </ModalSheet>
   );

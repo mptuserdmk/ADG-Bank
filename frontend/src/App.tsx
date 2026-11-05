@@ -30,6 +30,7 @@ import { CardDetailsModal } from './components/modals/CardDetailsModal';
 import { TransactionDetailsModal } from './components/modals/TransactionDetailsModal';
 import { AccountSwitcherModal } from './components/modals/AccountSwitcherModal';
 import { UserProfileModal } from './components/modals/UserProfileModal';
+import { GlobalSearchModal } from './components/modals/GlobalSearchModal';
 
 import { StockTradeModal } from './components/modals/StockTradeModal';
 import type { StockItem } from './components/modals/StockTradeModal';
@@ -87,6 +88,7 @@ export const RevolutBankApp: React.FC = () => {
   const [selectedCardForDetails, setSelectedCardForDetails] = useState<CardDTO | null>(null);
   const [isAccountSwitcherOpen, setIsAccountSwitcherOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
 
   // Trade modals state
   const [selectedStock, setSelectedStock] = useState<StockItem | null>(null);
@@ -184,13 +186,21 @@ export const RevolutBankApp: React.FC = () => {
     }
   };
 
-  const handleExecuteExchange = async (fromId: number, toId: number, fromAmt: number, toAmt: number) => {
-    const fromA = accounts.find((a) => a.id === fromId);
-    const toA = accounts.find((a) => a.id === toId);
-    if (fromA) fromA.balance -= fromAmt;
-    if (toA) toA.balance += toAmt;
+  const handleExecuteExchange = async (fromId: number, targetCurrency: string, fromAmt: number, toAmt: number) => {
+    let targetAcc = accounts.find((a) => a.currency.toUpperCase() === targetCurrency.toUpperCase());
+    if (!targetAcc) {
+      targetAcc = await BankAPI.createAccount(targetCurrency, 0);
+    }
+    await BankAPI.exchange(fromId, targetAcc.id, fromAmt, toAmt);
     qc.invalidateQueries({ queryKey: ['accounts'] });
-    showToast('Обмен валюты завершён', `${fromAmt} ${fromA?.currency} ➔ ${toAmt} ${toA?.currency}`);
+    qc.invalidateQueries({ queryKey: ['transactions'] });
+    confetti({
+      particleCount: 70,
+      spread: 60,
+      origin: { y: 0.75 },
+      colors: ['#0666EB', '#00D09C', '#984CFF'],
+    });
+    showToast('Обмен валюты завершён', `Списано ${fromAmt} ${currentAccount?.currency} ➔ Зачислено ${toAmt} ${targetCurrency}`);
   };
 
   const handleSaveCardLimits = (cardId: string, newLimit: number) => {
@@ -221,6 +231,7 @@ export const RevolutBankApp: React.FC = () => {
         searchQuery={searchQuery}
         isBackendConnected={BankAPI.isBackendConnected()}
         onSearch={setSearchQuery}
+        onOpenSearch={() => setIsGlobalSearchOpen(true)}
         onOpenAnalytics={() => setIsAnalyticsOpen(true)}
         onOpenQR={() => setIsQROpen(true)}
         onProfileClick={() => setIsProfileOpen(true)}
@@ -388,6 +399,8 @@ export const RevolutBankApp: React.FC = () => {
       <AnalyticsModal
         isOpen={isAnalyticsOpen}
         onClose={() => setIsAnalyticsOpen(false)}
+        transactions={transactions}
+        currency={currentAccount?.currency || 'EUR'}
       />
 
       {/* 7. QR Receive Modal Sheet */}
@@ -457,8 +470,11 @@ export const RevolutBankApp: React.FC = () => {
         accounts={accounts}
         currentAccountId={currentAccount?.id || 1}
         onSelectAccount={(accId) => setSelectedAccountId(accId)}
-        onAddNewAccount={() => {
-          showToast('Новый счёт', 'Заявка на мультивалютный счёт в USD принята');
+        onAddNewAccount={async (currency) => {
+          const created = await BankAPI.createAccount(currency, 0);
+          qc.invalidateQueries({ queryKey: ['accounts'] });
+          setSelectedAccountId(created.id);
+          showToast('Счёт открыт', `Мультивалютный счёт в ${created.currency} успешно открыт`);
         }}
       />
 
@@ -467,7 +483,20 @@ export const RevolutBankApp: React.FC = () => {
         isOpen={!!selectedStock}
         onClose={() => setSelectedStock(null)}
         stock={selectedStock}
-        onBuySuccess={(msg) => showToast('Ордер исполнен', msg)}
+        availableBalance={currentAccount?.balance || 0}
+        currency={currentAccount?.currency || 'EUR'}
+        onExecuteBuy={async (stock, count, totalCost) => {
+          await BankAPI.buyStock(currentAccount.id, stock.ticker, stock.name, count, totalCost);
+          qc.invalidateQueries({ queryKey: ['accounts'] });
+          qc.invalidateQueries({ queryKey: ['transactions'] });
+          confetti({
+            particleCount: 60,
+            spread: 50,
+            origin: { y: 0.7 },
+            colors: ['#10B981', '#0666EB', '#FFFFFF'],
+          });
+          showToast('Ордер исполнен', `Куплено ${count} шт. ${stock.ticker} на $${totalCost.toFixed(2)}`);
+        }}
       />
 
       {/* 17. Crypto Trade Modal Sheet */}
@@ -475,7 +504,20 @@ export const RevolutBankApp: React.FC = () => {
         isOpen={!!selectedCoin}
         onClose={() => setSelectedCoin(null)}
         coin={selectedCoin}
-        onTradeSuccess={(msg) => showToast('Криптовалюта зачислена', msg)}
+        availableBalance={currentAccount?.balance || 0}
+        currency={currentAccount?.currency || 'EUR'}
+        onExecuteBuy={async (coin, eurAmount, cryptoAmount) => {
+          await BankAPI.buyCrypto(currentAccount.id, coin.symbol, coin.name, eurAmount, cryptoAmount);
+          qc.invalidateQueries({ queryKey: ['accounts'] });
+          qc.invalidateQueries({ queryKey: ['transactions'] });
+          confetti({
+            particleCount: 60,
+            spread: 50,
+            origin: { y: 0.7 },
+            colors: ['#F59E0B', '#10B981', '#0666EB'],
+          });
+          showToast('Криптовалюта зачислена', `+${cryptoAmount.toFixed(6)} ${coin.symbol} за €${eurAmount.toFixed(2)}`);
+        }}
       />
 
       {/* 18. Perk Modal Sheet */}
@@ -492,6 +534,46 @@ export const RevolutBankApp: React.FC = () => {
         onClose={() => setIsProfileOpen(false)}
         onOpenExchange={() => setIsExchangeOpen(true)}
         onLogout={() => showToast('Выход выполнен', 'Сессия пользователя завершена', 'info')}
+      />
+
+      {/* 20. Global Unified Search Modal */}
+      <GlobalSearchModal
+        isOpen={isGlobalSearchOpen}
+        onClose={() => setIsGlobalSearchOpen(false)}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        accounts={accounts}
+        cards={cards}
+        transactions={transactions}
+        payees={payees}
+        onSelectAccount={(accId) => {
+          setSelectedAccountId(accId);
+          setActiveTab('home');
+        }}
+        onSelectCard={(c) => {
+          setSelectedCardForDetails(c);
+        }}
+        onSelectTransaction={(tx) => {
+          setSelectedTxForDetails(tx);
+        }}
+        onSelectPayee={(p) => {
+          setSelectedPayeeForTransfer(p);
+          setIsTransferOpen(true);
+        }}
+        onSelectCrypto={(coin) => {
+          setSelectedCoin(coin);
+        }}
+        onSelectStock={(stock) => {
+          setSelectedStock(stock);
+        }}
+        onQuickAction={(action) => {
+          if (action === 'transfer') setIsTransferOpen(true);
+          else if (action === 'exchange') setIsExchangeOpen(true);
+          else if (action === 'addMoney') setIsAddMoneyOpen(true);
+          else if (action === 'orderCard') setIsOrderCardOpen(true);
+          else if (action === 'openAccount') setIsAccountSwitcherOpen(true);
+          else if (action === 'analytics') setIsAnalyticsOpen(true);
+        }}
       />
     </DesktopShell>
   );

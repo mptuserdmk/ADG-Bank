@@ -124,35 +124,17 @@ export const HomeCardsCarousel: React.FC<HomeCardsCarouselProps> = ({
             }}
             whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.98 }}
-            className={`w-[92%] sm:w-[94%] h-[180px] sm:h-[195px] rounded-t-[22px] rounded-b-[16px] p-4 flex flex-col justify-start relative shadow-2xl cursor-grab active:cursor-grabbing border border-white/10 overflow-hidden ${
-              isMetal
-                ? 'bg-gradient-to-br from-[#1C1F22] via-[#2A2E33] to-[#121417]'
-                : currentCard.type === 'DISPOSABLE'
-                ? 'bg-gradient-to-br from-[#0666EB] via-[#984CFF] to-[#FF4E98]'
-                : 'bg-gradient-to-br from-[#18392B] via-[#0E5A3E] to-[#0A3022]'
-            }`}
+            style={{
+              background: currentCard.colorGradient || (
+                isMetal
+                  ? 'linear-gradient(135deg, #1C1F22 0%, #2A2E33 50%, #121417 100%)'
+                  : currentCard.type === 'DISPOSABLE'
+                  ? 'linear-gradient(135deg, #ff7eb3 0%, #ff758c 100%)'
+                  : 'linear-gradient(135deg, #4f56f1 0%, #984cff 100%)'
+              ),
+            }}
+            className="w-[92%] sm:w-[94%] h-[180px] sm:h-[195px] rounded-t-[22px] rounded-b-[16px] p-4 flex flex-col justify-start relative shadow-2xl cursor-grab active:cursor-grabbing border border-white/20 overflow-hidden"
           >
-            {/* Card Background Visual Texture */}
-            {isMetal ? (
-              <img
-                src="/assets/cards/card-metal.png"
-                alt="Metal Card Skin"
-                className="absolute inset-0 w-full h-full object-cover pointer-events-none opacity-90"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-              />
-            ) : (
-              <img
-                src="/assets/cards/card-gradient.jpg"
-                alt="Cyber Card Skin"
-                className="absolute inset-0 w-full h-full object-cover pointer-events-none opacity-80 mix-blend-screen"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-              />
-            )}
-
             {/* Subtle card glow overlay */}
             <div className="absolute -top-12 -right-12 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 

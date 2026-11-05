@@ -48,3 +48,27 @@ export const getCurrencyParts = (
   }
 };
 
+export const getExchangeRate = (fromCurr: string, toCurr: string): number => {
+  const f = (fromCurr || 'EUR').toUpperCase();
+  const t = (toCurr || 'USD').toUpperCase();
+  if (f === t) return 1;
+
+  // Base rates in EUR
+  const toEurRates: Record<string, number> = {
+    EUR: 1.0,
+    USD: 0.92,
+    RUB: 0.0098,
+    GBP: 1.17,
+    BTC: 64280.0,
+  };
+
+  const fromInEur = toEurRates[f] ?? 1.0;
+  const toInEur = toEurRates[t] ?? 1.0;
+
+  // e.g. 1 EUR in USD = 1.0 / 0.92 = 1.087
+  // e.g. 1 BTC in EUR = 64280 / 1.0 = 64280
+  const rate = fromInEur / toInEur;
+  return rate;
+};
+
+

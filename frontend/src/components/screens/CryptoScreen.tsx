@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import type { CryptoCoin } from '../modals/CryptoTradeModal';
+import { BankAPI } from '../../api/client';
 import { motion } from 'framer-motion';
 
 interface CryptoScreenProps {
@@ -15,6 +16,16 @@ export const CryptoScreen: React.FC<CryptoScreenProps> = ({ onSelectCoin, onExpl
     { name: 'Solana', symbol: 'SOL', price: '142.30', change: '-2.1%', isPos: false },
     { name: 'Toncoin', symbol: 'TON', price: '5.85', change: '+5.7%', isPos: true },
   ];
+
+  const holdings = BankAPI.getCryptoHoldings();
+
+  const totalEurValue = coins.reduce((acc, c) => {
+    const amount = holdings[c.symbol]?.amount || 0;
+    const price = parseFloat(c.price.replace(/,/g, '')) || 0;
+    return acc + amount * price;
+  }, 0);
+
+  const btcAmount = holdings['BTC']?.amount || 0;
 
   return (
     <div className="px-4 py-3 space-y-4 animate-fadeIn">
@@ -42,12 +53,16 @@ export const CryptoScreen: React.FC<CryptoScreenProps> = ({ onSelectCoin, onExpl
         <div className="relative z-10">
           <span className="text-xs font-semibold text-revolut-muted">Баланс криптовалюты</span>
           <div className="flex items-baseline gap-2 my-1">
-            <span className="text-3xl font-semibold text-white font-sans tabular-nums">€ 950.40</span>
+            <span className="text-3xl font-semibold text-white font-sans tabular-nums">
+              € {totalEurValue.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
             <span className="text-xs font-semibold text-revolut-green flex items-center">
               <ArrowUpRight className="w-3.5 h-3.5" /> +5.2%
             </span>
           </div>
-          <p className="text-[11px] text-revolut-muted font-sans tabular-nums">≈ 0.0152 BTC</p>
+          <p className="text-[11px] text-revolut-muted font-sans tabular-nums">
+            ≈ {btcAmount.toFixed(4)} BTC
+          </p>
         </div>
       </motion.div>
 

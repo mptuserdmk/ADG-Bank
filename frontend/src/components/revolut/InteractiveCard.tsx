@@ -47,6 +47,16 @@ export const InteractiveCard: React.FC<InteractiveCardProps> = ({
   };
 
   const isMetal = card.type === 'PHYSICAL' || (card.type as string) === 'METAL';
+  const isDisposable = card.type === 'DISPOSABLE';
+  const isVirtual = card.type === 'VIRTUAL';
+
+  const cardBackground = card.colorGradient || (
+    isMetal
+      ? 'linear-gradient(135deg, #1C1F22 0%, #2A2E33 50%, #121417 100%)'
+      : isDisposable
+      ? 'linear-gradient(135deg, #ff7eb3 0%, #ff758c 100%)'
+      : 'linear-gradient(135deg, #4f56f1 0%, #984cff 100%)'
+  );
 
   return (
     <div className="w-full flex justify-center py-2">
@@ -74,32 +84,19 @@ export const InteractiveCard: React.FC<InteractiveCardProps> = ({
             style={{
               backfaceVisibility: 'hidden',
               WebkitBackfaceVisibility: 'hidden',
+              background: cardBackground,
             }}
-            className={`absolute inset-0 w-full h-full rounded-[22px] overflow-hidden p-6 flex flex-col justify-between border border-white/10 shadow-2xl ${
-              isMetal
-                ? 'bg-gradient-to-br from-[#1C1F22] via-[#2A2E33] to-[#121417]'
-                : 'bg-gradient-to-br from-[#984CFF] via-[#0666EB] to-[#191C1F]'
-            }`}
+            className="absolute inset-0 w-full h-full rounded-[22px] overflow-hidden p-6 flex flex-col justify-between border border-white/20 shadow-2xl relative"
           >
-            {/* Background Texture */}
-            {isMetal ? (
-              <img
-                src="/assets/cards/card-metal.png"
-                alt="Metal Card Skin"
-                className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-              />
-            ) : (
-              <img
-                src="/assets/cards/card-gradient.jpg"
-                alt="Cyber Card Skin"
-                className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-              />
+            {/* Subtle background textures that don't wash out card color */}
+            {isMetal && (
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-40 pointer-events-none" />
+            )}
+            {isDisposable && (
+              <div className="absolute inset-0 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px] opacity-15 pointer-events-none" />
+            )}
+            {isVirtual && (
+              <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent opacity-30 pointer-events-none" />
             )}
 
             {/* Dynamic Glare Overlay */}
@@ -111,20 +108,21 @@ export const InteractiveCard: React.FC<InteractiveCardProps> = ({
               }}
             />
 
-            {/* Top row: Revolut R + Contactless */}
+            {/* Top row: Revolut R + Badge + Contactless */}
             <div className="relative z-10 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <img
-                  src="/assets/cards/revolut-r.svg"
-                  alt="Revolut"
-                  className="w-6 h-6 object-contain"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
-                />
-                <span className="font-bold tracking-tight text-white text-base">ADG-Bank</span>
+                <span className="font-bold tracking-tight text-white text-base drop-shadow-md">ADG-Bank</span>
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider uppercase border ${
+                  isDisposable
+                    ? 'bg-rose-500/30 text-rose-200 border-rose-400/40 animate-pulse'
+                    : isVirtual
+                    ? 'bg-blue-500/30 text-blue-200 border-blue-400/40'
+                    : 'bg-amber-500/30 text-amber-200 border-amber-400/40'
+                }`}>
+                  {isDisposable ? '⚡ Disposable' : isVirtual ? '✦ Virtual' : '★ Physical'}
+                </span>
               </div>
-              <div className="flex items-center gap-2 text-white/80">
+              <div className="flex items-center gap-2 text-white/90">
                 <Wifi className="w-5 h-5 rotate-90" />
               </div>
             </div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ModalSheet } from '../ui/ModalSheet';
-import { Check, ArrowRight } from 'lucide-react';
+import { Check, ArrowRight, AlertCircle } from 'lucide-react';
 
 export interface CryptoCoin {
   name: string;
@@ -14,18 +14,23 @@ interface CryptoTradeModalProps {
   coin: CryptoCoin | null;
   isOpen: boolean;
   onClose: () => void;
-  onTradeSuccess?: (msg: string) => void;
+  availableBalance?: number;
+  currency?: string;
+  onExecuteBuy?: (coin: CryptoCoin, eurAmount: number, cryptoAmount: number) => Promise<void>;
 }
 
 export const CryptoTradeModal: React.FC<CryptoTradeModalProps> = ({
   coin,
   isOpen,
   onClose,
-  onTradeSuccess,
+  availableBalance = 1000,
+  currency = 'EUR',
+  onExecuteBuy,
 }) => {
   const [eurAmount, setEurAmount] = useState<string>('50');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   if (!coin) return null;
 
@@ -33,18 +38,29 @@ export const CryptoTradeModal: React.FC<CryptoTradeModalProps> = ({
   const coinPrice = parseFloat(coin.price.replace(/,/g, '')) || 1;
   const estimatedCrypto = (inputEur / coinPrice).toFixed(6);
 
-  const handleBuy = () => {
+  const handleBuy = async () => {
     if (inputEur <= 0) return;
+    if (inputEur > availableBalance) {
+      setErrorMsg(`Недостаточно средств. Доступно: €${availableBalance.toFixed(2)}`);
+      return;
+    }
+
+    setErrorMsg('');
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      if (onExecuteBuy) {
+        await onExecuteBuy(coin, inputEur, parseFloat(estimatedCrypto));
+      }
       setIsSuccess(true);
-      onTradeSuccess?.(`Куплено ${estimatedCrypto} ${coin.symbol} за €${inputEur}`);
       setTimeout(() => {
         setIsSuccess(false);
         onClose();
-      }, 1400);
-    }, 700);
+      }, 1600);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Ошибка покупки криптовалюты');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -55,8 +71,11 @@ export const CryptoTradeModal: React.FC<CryptoTradeModalProps> = ({
             <Check className="w-8 h-8" />
           </div>
           <h4 className="text-lg font-bold text-white mb-1">Покупка совершена</h4>
-          <p className="text-xs text-revolut-muted font-sans tabular-nums">
-            Зачислено {estimatedCrypto} {coin.symbol}
+          <p className="text-sm font-semibold text-white mt-1 font-sans tabular-nums">
+            Зачислено +{estimatedCrypto} {coin.symbol}
+          </p>
+          <p className="text-xs text-revolut-muted mt-0.5 font-sans tabular-nums">
+            Списано €{inputEur.toFixed(2)} со счёта
           </p>
         </div>
       ) : (
@@ -72,7 +91,12 @@ export const CryptoTradeModal: React.FC<CryptoTradeModalProps> = ({
           </div>
 
           <div className="p-3.5 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-between">
-            <span className="text-xs font-semibold text-white">Сумма в EUR</span>
+            <div>
+              <span className="text-xs font-semibold text-white block">Сумма в {currency}</span>
+              <span className="text-[11px] text-revolut-muted font-sans tabular-nums">
+                Доступно: €{availableBalance.toFixed(2)}
+              </span>
+            </div>
             <input
               type="number"
               min="5"
@@ -88,12 +112,19 @@ export const CryptoTradeModal: React.FC<CryptoTradeModalProps> = ({
             <span className="text-sm font-bold text-revolut-green font-mono">{estimatedCrypto} {coin.symbol}</span>
           </div>
 
+          {errorMsg && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
           <button
             onClick={handleBuy}
-            disabled={isSubmitting || inputEur <= 0}
-            className="w-full h-12 rounded-full bg-revolut-blue hover:bg-revolut-blueHover text-white font-semibold text-sm transition-all flex items-center justify-center gap-2 active:scale-98 shadow-inner-light mt-2"
+            disabled={isSubmitting || inputEur <= 0 || inputEur > availableBalance}
+            className="w-full h-12 rounded-full bg-revolut-blue hover:bg-revolut-blueHover text-white font-semibold text-sm transition-all flex items-center justify-center gap-2 active:scale-98 disabled:opacity-50 shadow-inner-light mt-2"
           >
-            <span>{isSubmitting ? 'Обмен...' : `Купить ${coin.symbol} за €${inputEur}`}</span>
+            <span>{isSubmitting ? 'Обработка ордера...' : `Купить ${coin.symbol} за €${inputEur}`}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

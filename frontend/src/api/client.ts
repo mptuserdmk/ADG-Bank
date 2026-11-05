@@ -269,9 +269,38 @@ export const mockPayees: PayeeDTO[] = [
   { id: 'p5', name: 'Edvin', initials: 'E', accountNumber: 'ADG0001008', accountId: 8 },
 ];
 
+export interface CryptoHolding {
+  symbol: string;
+  name: string;
+  amount: number;
+}
+
+export interface StockHolding {
+  ticker: string;
+  name: string;
+  shares: number;
+}
+
+let mockCryptoHoldings: Record<string, CryptoHolding> = {
+  BTC: { symbol: 'BTC', name: 'Bitcoin', amount: 0.0152 },
+  ETH: { symbol: 'ETH', name: 'Ethereum', amount: 0.25 },
+  SOL: { symbol: 'SOL', name: 'Solana', amount: 1.5 },
+  TON: { symbol: 'TON', name: 'Toncoin', amount: 20 },
+};
+
+let mockStockHoldings: Record<string, StockHolding> = {
+  AAPL: { ticker: 'AAPL', name: 'Apple Inc.', shares: 12 },
+  NVDA: { ticker: 'NVDA', name: 'NVIDIA Corp.', shares: 2 },
+  TSLA: { ticker: 'TSLA', name: 'Tesla Inc.', shares: 4 },
+  MSFT: { ticker: 'MSFT', name: 'Microsoft', shares: 3 },
+};
+
 // --- High Level Banking API with Automatic Online/Offline Handshake ---
 export const BankAPI = {
   isBackendConnected: () => isBackendOnline,
+
+  getCryptoHoldings: () => ({ ...mockCryptoHoldings }),
+  getStockHoldings: () => ({ ...mockStockHoldings }),
 
   // Get Accounts of user
   getAccounts: async (userId = 1): Promise<AccountDTO[]> => {
@@ -287,17 +316,61 @@ export const BankAPI = {
               currency: 'EUR',
               initialBalance: 1250.50,
             });
+            mockAccounts = [created.data];
             return [created.data];
           } catch {
             return res.data;
           }
         }
+        res.data.forEach((acc) => {
+          const idx = mockAccounts.findIndex((a) => a.id === acc.id);
+          if (idx >= 0) mockAccounts[idx] = acc;
+          else mockAccounts.push(acc);
+        });
         return res.data;
       }
     } catch {
       isBackendOnline = false;
     }
     return mockAccounts;
+  },
+
+  // Create a new account
+  createAccount: async (currency: string, initialBalance = 0, userId = 1): Promise<AccountDTO> => {
+    const curr = currency.toUpperCase();
+    let createdAcc: AccountDTO | null = null;
+    try {
+      const res = await apiClient.post<AccountDTO>('/accounts', {
+        userId,
+        currency: curr,
+        initialBalance,
+      });
+      if (res.status === 200 || res.status === 201) {
+        isBackendOnline = true;
+        createdAcc = res.data;
+      }
+    } catch {
+      isBackendOnline = false;
+    }
+
+    if (!createdAcc) {
+      const newId = Date.now();
+      const numStr = (mockAccounts.length + 1).toString().padStart(4, '0');
+      createdAcc = {
+        id: newId,
+        userId,
+        accountNumber: `ADG000${numStr}`,
+        balance: initialBalance,
+        currency: curr,
+        status: 'ACTIVE',
+        createdAt: new Date().toISOString(),
+      };
+    }
+
+    if (!mockAccounts.some((a) => a.id === createdAcc!.id)) {
+      mockAccounts = [...mockAccounts, createdAcc];
+    }
+    return createdAcc;
   },
 
   // Get Transactions for account
@@ -314,31 +387,37 @@ export const BankAPI = {
     return mockTransactions;
   },
 
-  // Execute Transfer
+  // Execute Transfer (between own accounts or to payee)
   transfer: async (req: CreateTransactionRequestDTO): Promise<TransactionDTO> => {
     const key = generateUUID();
+    let resTx: TransactionDTO | null = null;
     try {
       const res = await apiClient.post<TransactionDTO>('/transactions', req, {
         headers: { 'X-Idempotency-Key': key }
       });
       if (res.status === 200 || res.status === 201) {
         isBackendOnline = true;
-        return res.data;
+        resTx = res.data;
       }
     } catch (error: any) {
-      if (error.response && error.response.status >= 400 && error.response.status < 500) {
+      if (error.response && error.response.status >= 400 && error.response.status < 500 && error.response.status !== 404) {
         const message = error.response.data?.message || 'Ошибка валидации банковской операции';
         throw new Error(message);
       }
       isBackendOnline = false;
     }
 
-    // Mock execution fallback only if network/server is completely down
+    // Always update mock balances and transactions
     const sourceAcc = mockAccounts.find((a) => a.id === req.sourceAccountId);
     if (sourceAcc) {
       sourceAcc.balance = Math.max(0, sourceAcc.balance - req.amount);
     }
-    const newTx: TransactionDTO = {
+    const targetAcc = mockAccounts.find((a) => a.id === req.targetAccountId);
+    if (targetAcc) {
+      targetAcc.balance += req.amount;
+    }
+
+    const newTx: TransactionDTO = resTx || {
       id: Date.now(),
       idempotencyKey: key,
       sourceAccountId: req.sourceAccountId,
@@ -346,9 +425,140 @@ export const BankAPI = {
       amount: -req.amount,
       currency: sourceAcc ? sourceAcc.currency : 'EUR',
       status: 'COMPLETED',
-      merchantName: req.description || 'Transfer',
-      category: 'Transfer',
-      description: req.description || 'Direct Transfer',
+      merchantName: req.description || 'Перевод средств',
+      category: 'TRANSFER',
+      description: req.description || 'Прямой перевод',
+      createdAt: new Date().toISOString(),
+    };
+    mockTransactions = [newTx, ...mockTransactions];
+    return newTx;
+  },
+
+  // Currency Exchange between two accounts with atomic balance updates
+  exchange: async (fromAccountId: number, toAccountId: number, fromAmt: number, toAmt: number): Promise<TransactionDTO> => {
+    const key = generateUUID();
+    const fromAcc = mockAccounts.find((a) => a.id === fromAccountId);
+    const toAcc = mockAccounts.find((a) => a.id === toAccountId);
+    const fromCurr = fromAcc?.currency || 'EUR';
+    const toCurr = toAcc?.currency || 'USD';
+
+    let resTx: TransactionDTO | null = null;
+    try {
+      const res = await apiClient.post<TransactionDTO>('/transactions', {
+        sourceAccountId: fromAccountId,
+        targetAccountId: toAccountId,
+        amount: fromAmt,
+        description: `Обмен валюты ${fromCurr} ➔ ${toCurr}`,
+      }, {
+        headers: { 'X-Idempotency-Key': key }
+      });
+      if (res.status === 200 || res.status === 201) {
+        isBackendOnline = true;
+        resTx = res.data;
+      }
+    } catch {
+      isBackendOnline = false;
+    }
+
+    // Update in-memory mock state immediately
+    if (fromAcc) {
+      fromAcc.balance = Math.max(0, fromAcc.balance - fromAmt);
+    }
+    if (toAcc) {
+      toAcc.balance += toAmt;
+    }
+
+    const newTx: TransactionDTO = resTx || {
+      id: Date.now(),
+      idempotencyKey: key,
+      sourceAccountId: fromAccountId,
+      targetAccountId: toAccountId,
+      amount: -fromAmt,
+      currency: fromCurr,
+      status: 'COMPLETED',
+      merchantName: `Обмен на ${toCurr}`,
+      category: 'EXCHANGE',
+      description: `Конвертация ${fromAmt} ${fromCurr} ➔ ${toAmt.toFixed(2)} ${toCurr}`,
+      createdAt: new Date().toISOString(),
+    };
+    mockTransactions = [newTx, ...mockTransactions];
+    return newTx;
+  },
+
+  // Buy Crypto with balance deduction and portfolio tracking
+  buyCrypto: async (accountId: number, symbol: string, coinName: string, eurAmount: number, cryptoAmount: number): Promise<TransactionDTO> => {
+    const key = generateUUID();
+    try {
+      await apiClient.put(`/accounts/${accountId}/balance`, {
+        amount: eurAmount,
+        operationType: 'DEBIT',
+        referenceId: key,
+      });
+      isBackendOnline = true;
+    } catch {
+      isBackendOnline = false;
+    }
+
+    const acc = mockAccounts.find((a) => a.id === accountId);
+    if (acc) {
+      acc.balance = Math.max(0, acc.balance - eurAmount);
+    }
+
+    if (!mockCryptoHoldings[symbol]) {
+      mockCryptoHoldings[symbol] = { symbol, name: coinName, amount: 0 };
+    }
+    mockCryptoHoldings[symbol].amount += cryptoAmount;
+
+    const newTx: TransactionDTO = {
+      id: Date.now(),
+      idempotencyKey: key,
+      sourceAccountId: accountId,
+      amount: -eurAmount,
+      currency: acc ? acc.currency : 'EUR',
+      status: 'COMPLETED',
+      merchantName: `Покупка ${symbol}`,
+      category: 'CRYPTO',
+      description: `Покупка ${cryptoAmount.toFixed(6)} ${symbol}`,
+      createdAt: new Date().toISOString(),
+    };
+    mockTransactions = [newTx, ...mockTransactions];
+    return newTx;
+  },
+
+  // Buy Stock with balance deduction and portfolio tracking
+  buyStock: async (accountId: number, ticker: string, stockName: string, shares: number, totalCost: number): Promise<TransactionDTO> => {
+    const key = generateUUID();
+    try {
+      await apiClient.put(`/accounts/${accountId}/balance`, {
+        amount: totalCost,
+        operationType: 'DEBIT',
+        referenceId: key,
+      });
+      isBackendOnline = true;
+    } catch {
+      isBackendOnline = false;
+    }
+
+    const acc = mockAccounts.find((a) => a.id === accountId);
+    if (acc) {
+      acc.balance = Math.max(0, acc.balance - totalCost);
+    }
+
+    if (!mockStockHoldings[ticker]) {
+      mockStockHoldings[ticker] = { ticker, name: stockName, shares: 0 };
+    }
+    mockStockHoldings[ticker].shares += shares;
+
+    const newTx: TransactionDTO = {
+      id: Date.now(),
+      idempotencyKey: key,
+      sourceAccountId: accountId,
+      amount: -totalCost,
+      currency: acc ? acc.currency : 'EUR',
+      status: 'COMPLETED',
+      merchantName: `Покупка ${ticker}`,
+      category: 'INVESTMENTS',
+      description: `Покупка ${shares} шт. ${stockName}`,
       createdAt: new Date().toISOString(),
     };
     mockTransactions = [newTx, ...mockTransactions];
@@ -366,6 +576,8 @@ export const BankAPI = {
       });
       if (res.status === 200) {
         isBackendOnline = true;
+        const acc = mockAccounts.find((a) => a.id === accountId);
+        if (acc) acc.balance = res.data.balance;
         return res.data;
       }
     } catch (error: any) {
@@ -387,7 +599,7 @@ export const BankAPI = {
           currency: acc.currency,
           status: 'COMPLETED',
           merchantName: 'Top-Up via Card',
-          category: 'Deposit',
+          category: 'DEPOSIT',
           description: 'Instant Card Top-up',
           createdAt: new Date().toISOString(),
         },

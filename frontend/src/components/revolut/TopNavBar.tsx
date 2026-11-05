@@ -7,6 +7,7 @@ interface TopNavBarProps {
   searchQuery?: string;
   isBackendConnected?: boolean;
   onSearch?: (query: string) => void;
+  onOpenSearch?: () => void;
   onOpenAnalytics?: () => void;
   onOpenQR?: () => void;
   onProfileClick?: () => void;
@@ -17,6 +18,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   searchQuery = '',
   isBackendConnected = false,
   onSearch,
+  onOpenSearch,
   onOpenAnalytics,
   onOpenQR,
   onProfileClick,
@@ -45,15 +47,19 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
         />
       </motion.button>
 
-      {/* Search Input */}
-      <div className="flex-1 relative">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-revolut-muted" />
+      {/* Search Input - Clicking opens Global Search */}
+      <div 
+        onClick={onOpenSearch}
+        className="flex-1 relative cursor-pointer group"
+      >
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-revolut-muted group-hover:text-white transition-colors" />
         <input
           type="text"
+          readOnly={!!onOpenSearch}
           value={searchQuery}
-          placeholder="Поиск по счетам..."
+          placeholder="Поиск по счетам, картам, контактам..."
           onChange={(e) => onSearch?.(e.target.value)}
-          className="w-full h-10 pl-9 pr-3 bg-white/[0.06] hover:bg-white/[0.09] border border-white/[0.08] rounded-full text-xs sm:text-sm text-white placeholder-revolut-muted focus:outline-none focus:border-revolut-blue focus:ring-1 focus:ring-revolut-blue transition-all"
+          className="w-full h-10 pl-9 pr-3 bg-white/[0.06] hover:bg-white/[0.09] border border-white/[0.08] group-hover:border-white/20 rounded-full text-xs sm:text-sm text-white placeholder-revolut-muted focus:outline-none focus:border-revolut-blue focus:ring-1 focus:ring-revolut-blue transition-all cursor-pointer"
         />
       </div>
 
